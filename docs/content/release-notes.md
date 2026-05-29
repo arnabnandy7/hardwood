@@ -23,6 +23,8 @@ Highlights of this release:
 - Coordinated multi-column reads via `ColumnReaders.nextBatch()` / `getRecordCount()`
 - Richer `RowReader` value model: by-index field access on `PqStruct`, key-based lookup and typed accessors on `PqMap`, typed `List` accessors on `PqList`, and additional variant accessors
 - Float16 filter predicates and recognition of the `NullType` logical annotation
+- First-cut geospatial support (GEOMETRY/GEOGRAPHY logical types and bounding-box metadata)
+- Reading of local files larger than 2 GB
 - CLI: exhaustive logical-type formatting; `hardwood dive`: faster navigation of large collections and corrected "go to latest" in the data preview
 
 See the [1.0.0.CR1 milestone](https://github.com/hardwood-hq/hardwood/milestone/6?closed=1) on GitHub for the full list of resolved issues.
