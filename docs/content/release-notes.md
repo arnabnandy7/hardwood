@@ -13,6 +13,26 @@
 
 See [GitHub Releases](https://github.com/hardwood-hq/hardwood/releases) for downloads and more information.
 
+## 1.0.0.Final (2026-06-24)
+
+[API changes](/api-changes/1.0.0.Final/)
+
+<!-- TODO at release: add the announcement blog post link here, as a follow-up commit (see CR1).  · [API changes](/api-changes/1.0.0.Final/) -->
+
+Highlights of this release:
+
+- Float and double row group and page pruning honors the file's column order, with `ColumnOrder` surfaced on the API; `ResolvedPredicate` float/double convenience constructors are now public
+- Legacy list encodings from older writers — un-annotated repeated fields and 2-level lists — are recognized as lists
+- MAP columns without a value field (key-only `key_value` groups) are read instead of throwing
+- `ColumnReader` and `RowReader` `close()` methods are now idempotent, fixing a close-time performance regression introduced in Beta2
+- Logical types render as Parquet-style annotation tokens (e.g. `STRING`) instead of a misleading record `toString()`
+- `hardwood dive` fails fast with a clear message when stdout is not an interactive terminal
+- Documentation and tooling polish: corrected Docker image tags in the published docs, a single unified API change report linking each version to its commit, and stable JavaDoc diagrams
+
+See the [1.0.0.Final milestone](https://github.com/hardwood-hq/hardwood/milestone/7?closed=1) on GitHub for the full list of resolved issues.
+
+Thank you to all contributors to this release: [Fawzi Essam](https://github.com/iifawzi), [Gunnar Morling](https://github.com/gunnarmorling), [Leo Chashnikov](https://github.com/RayanRal), [Mohamed Ibrahim Elsawy](https://github.com/mohamedibrahim54), [Rion Williams](https://github.com/rionmonster), [Yash Priyadarshan](https://github.com/yashpriyadarshan).
+
 ## 1.0.0.CR2 (2026-06-7)
 
 [API changes](/api-changes/1.0.0.CR2/)
