@@ -33,7 +33,7 @@ See the [1.0.0.Final milestone](https://github.com/hardwood-hq/hardwood/mileston
 
 Thank you to all contributors to this release: [Fawzi Essam](https://github.com/iifawzi), [Gunnar Morling](https://github.com/gunnarmorling), [Leo Chashnikov](https://github.com/RayanRal), [Mohamed Ibrahim Elsawy](https://github.com/mohamedibrahim54), [Rion Williams](https://github.com/rionmonster), [Yash Priyadarshan](https://github.com/yashpriyadarshan).
 
-## 1.0.0.CR2 (2026-06-7)
+## 1.0.0.CR2 (2026-06-07)
 
 [API changes](/api-changes/1.0.0.CR2/)
 
