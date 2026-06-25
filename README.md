@@ -14,7 +14,7 @@ Goals of the project are:
 * Be fast: Be as fast or faster as parquet-java
 * Be complete: Add a Parquet file writer (after 1.0)
 
-Latest version: 1.0.0.CR2, 2026-06-07
+Latest version: 1.0.0.Final, 2026-06-25
 
 ## Documentation
 
@@ -26,7 +26,7 @@ Full documentation is available at **[hardwood.dev](https://hardwood.dev/)**.
 <dependency>
     <groupId>dev.hardwood</groupId>
     <artifactId>hardwood-core</artifactId>
-    <version>1.0.0.CR2</version>
+    <version>1.0.0.Final</version>
 </dependency>
 ```
 
