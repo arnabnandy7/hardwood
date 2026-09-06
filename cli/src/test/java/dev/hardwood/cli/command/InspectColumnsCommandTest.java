@@ -20,12 +20,12 @@ class InspectColumnsCommandTest implements InspectColumnsCommandContract {
 
     @Override
     public String plainFile() {
-        return getClass().getResource("/plain_uncompressed.parquet").getPath();
+        return Cli.resourcePath("/plain_uncompressed.parquet");
     }
 
     @Override
     public String pageIndexFile() {
-        return getClass().getResource("/column_index_pushdown.parquet").getPath();
+        return Cli.resourcePath("/column_index_pushdown.parquet");
     }
 
     @Override
@@ -45,7 +45,7 @@ class InspectColumnsCommandTest implements InspectColumnsCommandContract {
     @Test
     void populatesUnencodedSizeForEveryColumn() {
         Cli.Result result = Cli.launch("inspect", "columns", "-f",
-                getClass().getResource("/size_statistics_test.parquet").getPath());
+                Cli.resourcePath("/size_statistics_test.parquet"));
 
         assertThat(result.exitCode()).isZero();
         // `name` holds 3 present values totalling 15 bytes, recorded in the footer.
@@ -94,7 +94,7 @@ class InspectColumnsCommandTest implements InspectColumnsCommandContract {
     }
 
     private String diveFixtureFile() {
-        return getClass().getResource("/dive_screenshots_fixture.parquet").getPath();
+        return Cli.resourcePath("/dive_screenshots_fixture.parquet");
     }
 
     /// One cell of the ranked table, found by header name rather than by
@@ -121,7 +121,7 @@ class InspectColumnsCommandTest implements InspectColumnsCommandContract {
     }
 
     private String sizeStatisticsFile() {
-        return getClass().getResource("/size_statistics_test.parquet").getPath();
+        return Cli.resourcePath("/size_statistics_test.parquet");
     }
 
     /// The detail mode is the non-interactive twin of the dive facts pane:
@@ -154,7 +154,7 @@ class InspectColumnsCommandTest implements InspectColumnsCommandContract {
     }
 
     private String multiRowGroupFile() {
-        return getClass().getResource("/dive_screenshots_fixture.parquet").getPath();
+        return Cli.resourcePath("/dive_screenshots_fixture.parquet");
     }
 
     /// The file-wide block has to be the file's own histogram. This fixture

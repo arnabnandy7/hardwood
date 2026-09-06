@@ -41,6 +41,7 @@ $ printf '\e[8;35;120t'
 # 4. Record. COLORTERM=truecolor is the load-bearing part: dive only emits
 #    24-bit RGB accent/selection colours when it sees it (Theme.supportsTruecolor),
 #    otherwise it falls back to indexed ANSI 33/34 and the cast looks washed out.
+#    Alternatively, set -Dhardwood.dive.truecolor=true.
 $ asciinema rec dive-demo.cast \
       --rows 35 --cols 120 --idle-time-limit 2 \
       --title "hardwood dive — Overture Places" \
@@ -77,6 +78,14 @@ $ asciinema upload dive-demo.cast                          # asciinema.org URL
 $ agg dive-demo.cast dive-demo.gif                         # GIF
 $ agg --theme monokai --font-size 14 dive-demo.cast dive-demo.gif
 ```
+
+After uploading to asciinema.org, update the embedded cast ID in `docs/content/reference/cli.md`:
+
+```html
+<script src="https://asciinema.org/a/<new-cast-id>.js" id="asciicast-<new-cast-id>" async="true"></script>
+```
+
+And update `_demos/dive-demo.cast` with the new recording file.
 
 ## Tips for clean takes
 

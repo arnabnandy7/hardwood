@@ -7,7 +7,6 @@
  */
 package dev.hardwood.cli.internal;
 
-import java.io.IOException;
 import java.nio.file.Path;
 
 import org.junit.jupiter.api.BeforeAll;
@@ -43,8 +42,8 @@ class RowValueFormatterIntervalTest {
     private String row2Expanded;
 
     @BeforeAll
-    void readAll() throws IOException {
-        Path file = Path.of(getClass().getResource("/interval_logical_type_test.parquet").getPath());
+    void readAll() throws Exception {
+        Path file = Path.of(getClass().getResource("/interval_logical_type_test.parquet").toURI());
         try (ParquetFileReader fileReader = ParquetFileReader.open(InputFile.of(file));
              RowReader rowReader = fileReader.rowReader()) {
             FileSchema schema = fileReader.getFileSchema();

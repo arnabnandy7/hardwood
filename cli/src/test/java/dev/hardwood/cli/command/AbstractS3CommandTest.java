@@ -11,6 +11,9 @@ package dev.hardwood.cli.command;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeAll;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.MountableFile;
 
@@ -68,25 +71,46 @@ abstract class AbstractS3CommandTest {
         return MountableFile.forHostPath(TEST_RESOURCES.resolve(name));
     }
 
+    private static final boolean DOCKER_AVAILABLE;
+
     static {
-        s3.start();
-
+        boolean available = false;
         try {
-            // Redirect AWS profile files to an empty temp file so the SDK does not parse
-            // the developer's ~/.aws/config (which may contain non-standard profiles that
-            // trigger parse warnings and interfere with the test credential provider chain).
-            String emptyFile = Files.createTempFile("hardwood-test-aws", "").toString();
-            System.setProperty("aws.configFile", emptyFile);
-            System.setProperty("aws.sharedCredentialsFile", emptyFile);
+            available = DockerClientFactory.instance().isDockerAvailable();
+        }
+        catch (Throwable ignored) {
+        }
+        DOCKER_AVAILABLE = available;
 
-            System.setProperty("aws.accessKeyId", S3ProxyContainers.ACCESS_KEY);
-            System.setProperty("aws.secretAccessKey", S3ProxyContainers.SECRET_KEY);
-            System.setProperty("aws.region", "us-east-1");
-            System.setProperty("aws.endpointUrl", S3ProxyContainers.endpoint(s3));
-            System.setProperty("aws.pathStyle", "true");
+        if (DOCKER_AVAILABLE) {
+            s3.start();
+
+            try {
+                // Redirect AWS profile files to an empty temp file so the SDK does not parse
+                // the developer's ~/.aws/config (which may contain non-standard profiles that
+                // trigger parse warnings and interfere with the test credential provider chain).
+                String emptyFile = Files.createTempFile("hardwood-test-aws", "").toString();
+                System.setProperty("aws.configFile", emptyFile);
+                System.setProperty("aws.sharedCredentialsFile", emptyFile);
+
+                System.setProperty("aws.accessKeyId", S3ProxyContainers.ACCESS_KEY);
+                System.setProperty("aws.secretAccessKey", S3ProxyContainers.SECRET_KEY);
+                System.setProperty("aws.region", "us-east-1");
+                System.setProperty("aws.endpointUrl", S3ProxyContainers.endpoint(s3));
+                System.setProperty("aws.pathStyle", "true");
+            }
+            catch (Exception e) {
+                throw new ExceptionInInitializerError(e);
+            }
         }
-        catch (Exception e) {
-            throw new ExceptionInInitializerError(e);
-        }
+    }
+
+    @BeforeAll
+    static void checkDocker() {
+        Assumptions.assumeTrue(DOCKER_AVAILABLE, "Docker is not available for Testcontainers");
+    }
+
+    static boolean isDockerAvailable() {
+        return DOCKER_AVAILABLE;
     }
 }

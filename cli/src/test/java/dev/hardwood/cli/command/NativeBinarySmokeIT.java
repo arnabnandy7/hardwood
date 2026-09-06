@@ -31,7 +31,7 @@ class NativeBinarySmokeIT {
     private static final Pattern VERSION_LINE = Pattern.compile("hardwood \\d+\\.\\d+\\.\\d+\\S* \\(\\S+\\)");
 
     private final String nativeBinary = System.getProperty("native.image.path");
-    private final String plainFile = getClass().getResource("/plain_uncompressed.parquet").getPath();
+    private final String plainFile = Cli.resourcePath("/plain_uncompressed.parquet");
 
     @Test
     void readsLocalFile() throws IOException, InterruptedException {

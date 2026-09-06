@@ -241,7 +241,7 @@ hardwood dive -f data.parquet
 
 `dive` requires an interactive terminal. When stdin or stdout is not a TTY (e.g., a `docker run` without `-it`, or output piped to a file), it exits with an error instead of launching the UI.
 
-<script src="https://asciinema.org/a/992284.js" id="asciicast-992284" async="true"></script>
+<script src="https://asciinema.org/a/4inbZRSnMYGVGnXI.js" id="asciicast-4inbZRSnMYGVGnXI" async="true"></script>
 
 ### What you can do with it
 

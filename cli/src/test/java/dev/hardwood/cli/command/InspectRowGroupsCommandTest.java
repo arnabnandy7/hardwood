@@ -15,7 +15,7 @@ class InspectRowGroupsCommandTest implements InspectRowGroupsCommandContract {
 
     @Override
     public String plainFile() {
-        return getClass().getResource("/plain_uncompressed.parquet").getPath();
+        return Cli.resourcePath("/plain_uncompressed.parquet");
     }
 
     @Override

@@ -23,15 +23,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class SchemaCommandTest implements SchemaCommandContract {
 
-    private final String NESTED_FILE = this.getClass().getResource("/nested_struct_test.parquet").getPath();
+    private final String NESTED_FILE = Cli.resourcePath("/nested_struct_test.parquet");
 
-    private final String VARIANT_FILE = this.getClass().getResource("/variant_test.parquet").getPath();
+    private final String VARIANT_FILE = Cli.resourcePath("/variant_test.parquet");
 
-    private final String VARIANT_SHREDDED_FILE = this.getClass().getResource("/variant_shredded_test.parquet").getPath();
+    private final String VARIANT_SHREDDED_FILE = Cli.resourcePath("/variant_shredded_test.parquet");
 
     @Override
     public String plainFile() {
-        return getClass().getResource("/plain_uncompressed.parquet").getPath();
+        return Cli.resourcePath("/plain_uncompressed.parquet");
     }
 
     @Override

@@ -32,7 +32,7 @@ class DiveAppTest {
     @BeforeEach
     void openFixture() throws Exception {
         dev.hardwood.cli.dive.internal.Keys.resetObservedGeometry();
-        Path path = Path.of(getClass().getResource("/column_index_pushdown.parquet").getPath());
+        Path path = Path.of(getClass().getResource("/column_index_pushdown.parquet").toURI());
         model = ParquetModel.open(InputFile.of(path), path.toString());
         app = new DiveApp(model);
     }
