@@ -19,6 +19,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import dev.hardwood.InputFile;
 import dev.hardwood.OutputFile;
+import dev.hardwood.cli.TestResources;
 import dev.hardwood.metadata.ColumnChunk;
 import dev.hardwood.metadata.PhysicalType;
 import dev.hardwood.metadata.RepetitionType;
@@ -32,12 +33,12 @@ class InspectColumnsCommandTest implements InspectColumnsCommandContract {
 
     @Override
     public String plainFile() {
-        return getClass().getResource("/plain_uncompressed.parquet").getPath();
+        return Cli.file("/plain_uncompressed.parquet");
     }
 
     @Override
     public String pageIndexFile() {
-        return getClass().getResource("/column_index_pushdown.parquet").getPath();
+        return Cli.file("/column_index_pushdown.parquet");
     }
 
     @Override
@@ -57,7 +58,7 @@ class InspectColumnsCommandTest implements InspectColumnsCommandContract {
     @Test
     void populatesUnencodedSizeForEveryColumn() {
         Cli.Result result = Cli.launch("inspect", "columns", "-f",
-                getClass().getResource("/size_statistics_test.parquet").getPath());
+                Cli.file("/size_statistics_test.parquet"));
 
         assertThat(result.exitCode()).isZero();
         // `name` holds 3 present values totalling 15 bytes, recorded in the footer.
@@ -90,7 +91,7 @@ class InspectColumnsCommandTest implements InspectColumnsCommandContract {
     /// rather than showing `—` for its page count.
     @Test
     void aDamagedOffsetIndexIsReported(@TempDir Path tempDir) throws IOException {
-        Path source = Path.of(getClass().getResource("/column_index_pushdown.parquet").getPath());
+        Path source = TestResources.path("/column_index_pushdown.parquet");
         long offset;
         try (ParquetFileReader reader = ParquetFileReader.open(InputFile.of(source))) {
             offset = reader.getFileMetaData().rowGroups().get(0).columns().get(0).offsetIndexOffset();
@@ -105,7 +106,7 @@ class InspectColumnsCommandTest implements InspectColumnsCommandContract {
     }
 
     private Path damageFirstDictionaryPageHeader(Path tempDir) throws IOException {
-        Path source = Path.of(getClass().getResource("/dictionary_uncompressed.parquet").getPath());
+        Path source = TestResources.path("/dictionary_uncompressed.parquet");
         long offset;
         try (ParquetFileReader reader = ParquetFileReader.open(InputFile.of(source))) {
             ColumnChunk chunk = reader.getFileMetaData().rowGroups().get(0).columns().get(1);
@@ -148,7 +149,7 @@ class InspectColumnsCommandTest implements InspectColumnsCommandContract {
     @Test
     void aDictionaryWithoutItsDeclaredOffsetCarriesItsCardinality() {
         Cli.Result result = Cli.launch("inspect", "columns", "-f",
-                getClass().getResource("/dict_missing_page_offset.parquet").getPath());
+                Cli.file("/dict_missing_page_offset.parquet"));
 
         assertThat(result.exitCode()).isZero();
         assertThat(rankedCellOf(result.output(), "label", "Encoding")).isEqualTo("DICT 3%");
@@ -166,7 +167,7 @@ class InspectColumnsCommandTest implements InspectColumnsCommandContract {
     }
 
     private String diveFixtureFile() {
-        return getClass().getResource("/dive_screenshots_fixture.parquet").getPath();
+        return Cli.file("/dive_screenshots_fixture.parquet");
     }
 
     /// One cell of the ranked table, found by header name rather than by
@@ -193,7 +194,7 @@ class InspectColumnsCommandTest implements InspectColumnsCommandContract {
     }
 
     private String sizeStatisticsFile() {
-        return getClass().getResource("/size_statistics_test.parquet").getPath();
+        return Cli.file("/size_statistics_test.parquet");
     }
 
     /// The detail mode is the non-interactive twin of the dive facts pane:
@@ -226,7 +227,7 @@ class InspectColumnsCommandTest implements InspectColumnsCommandContract {
     }
 
     private String multiRowGroupFile() {
-        return getClass().getResource("/dive_screenshots_fixture.parquet").getPath();
+        return Cli.file("/dive_screenshots_fixture.parquet");
     }
 
     /// The file-wide block has to be the file's own histogram. This fixture

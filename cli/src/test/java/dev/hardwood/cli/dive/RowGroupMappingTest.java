@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import dev.hardwood.InputFile;
+import dev.hardwood.cli.TestResources;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -30,7 +31,7 @@ class RowGroupMappingTest {
 
     @BeforeEach
     void open() throws IOException {
-        Path path = Path.of(RowGroupMappingTest.class.getResource("/" + FIXTURE).getPath());
+        Path path = TestResources.path("/" + FIXTURE);
         model = ParquetModel.open(InputFile.of(path), FIXTURE);
     }
 

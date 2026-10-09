@@ -27,9 +27,9 @@ class DiveCommandTest {
 
     @Test
     void smokeRenderExitsZero() {
-        Path fixture = Path.of(getClass().getResource("/compat_plain_int64.parquet").getPath());
+        String fixture = Cli.file("/compat_plain_int64.parquet");
 
-        Cli.Result result = Cli.launch("dive", "-f", fixture.toString(), "--smoke-render");
+        Cli.Result result = Cli.launch("dive", "-f", fixture, "--smoke-render");
 
         assertThat(result.exitCode())
                 .withFailMessage("smoke-render failed: stdout=%s | stderr=%s", result.output(), result.errorOutput())
@@ -49,9 +49,9 @@ class DiveCommandTest {
     /// `-it` hits.
     @Test
     void failsFastWithoutTty() {
-        Path fixture = Path.of(getClass().getResource("/compat_plain_int64.parquet").getPath());
+        String fixture = Cli.file("/compat_plain_int64.parquet");
 
-        Cli.Result result = Cli.launch("dive", "-f", fixture.toString());
+        Cli.Result result = Cli.launch("dive", "-f", fixture);
 
         assertThat(result.exitCode()).isNotZero();
         assertThat(result.errorOutput()).containsIgnoringCase("interactive terminal");
@@ -60,10 +60,10 @@ class DiveCommandTest {
     /// A log file that cannot be opened fails `dive` before the session starts, naming the file.
     @Test
     void failsWhenTheLogFileCannotBeOpened(@TempDir Path tempDir) {
-        Path fixture = Path.of(getClass().getResource("/compat_plain_int64.parquet").getPath());
+        String fixture = Cli.file("/compat_plain_int64.parquet");
         Path logFile = tempDir.resolve("missing").resolve("dive.log");
 
-        Cli.Result result = Cli.launch("dive", "-f", fixture.toString(), "--smoke-render",
+        Cli.Result result = Cli.launch("dive", "-f", fixture, "--smoke-render",
                 "--log-file", logFile.toString());
 
         assertThat(result.exitCode()).isNotZero();
@@ -75,7 +75,7 @@ class DiveCommandTest {
     /// command prints its warnings to stderr again.
     @Test
     void logFileTakesTheSessionsRecordsAndStderrResumesAfter(@TempDir Path tempDir) throws IOException {
-        String fixture = getClass().getResource("/annotated_repeated_group_test.parquet").getPath();
+        String fixture = Cli.file("/annotated_repeated_group_test.parquet");
         Path logFile = tempDir.resolve("dive.log");
 
         Cli.Result dive = Cli.launch("dive", "-f", fixture, "--smoke-render", "--log-file", logFile.toString());

@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 
 import dev.hardwood.InputFile;
+import dev.hardwood.cli.TestResources;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -25,7 +26,7 @@ class DataPreviewIoTest {
 
     /// 3 row groups of 100 rows each: id 1..100, 101..200, 201..300.
     private static Path fixture() {
-        return Path.of(DataPreviewIoTest.class.getResource("/filter_pushdown_int.parquet").getPath());
+        return TestResources.path("/filter_pushdown_int.parquet");
     }
 
     @Test

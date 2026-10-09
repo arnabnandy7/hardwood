@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 import dev.hardwood.InputFile;
+import dev.hardwood.cli.TestResources;
 import dev.hardwood.metadata.ColumnMetaData;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,8 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ParquetModelChunkReadTest {
 
     /// One row group, 10 000 rows; column 1 (`category`) is dictionary-encoded with 10 entries.
-    private static final Path FIXTURE = Path.of(ParquetModelChunkReadTest.class
-            .getResource("/column_index_pushdown_dict.parquet").getPath());
+    private static final Path FIXTURE = TestResources.path("/column_index_pushdown_dict.parquet");
 
     private static final int DICTIONARY_COLUMN = 1;
 

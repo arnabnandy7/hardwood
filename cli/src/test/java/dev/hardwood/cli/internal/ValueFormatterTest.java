@@ -30,6 +30,7 @@ import org.skyscreamer.jsonassert.JSONCompareMode;
 
 import dev.hardwood.InputFile;
 import dev.hardwood.OutputFile;
+import dev.hardwood.cli.TestResources;
 import dev.hardwood.metadata.FieldPath;
 import dev.hardwood.metadata.LogicalType;
 import dev.hardwood.metadata.PhysicalType;
@@ -80,7 +81,7 @@ class ValueFormatterTest {
 
     @BeforeAll
     void readIntervalFixture() throws IOException {
-        Path file = Path.of(getClass().getResource("/interval_logical_type_test.parquet").getPath());
+        Path file = TestResources.path("/interval_logical_type_test.parquet");
         try (ParquetFileReader fileReader = ParquetFileReader.open(InputFile.of(file));
              RowReader rowReader = fileReader.rowReader()) {
             FileSchema schema = fileReader.getFileSchema();
@@ -130,7 +131,7 @@ class ValueFormatterTest {
     }
 
     private void withIntervalReader(IntervalReaderCase testCase) throws IOException {
-        Path file = Path.of(getClass().getResource("/interval_logical_type_test.parquet").getPath());
+        Path file = TestResources.path("/interval_logical_type_test.parquet");
         try (ParquetFileReader fileReader = ParquetFileReader.open(InputFile.of(file));
              RowReader rowReader = fileReader.rowReader()) {
             testCase.run(rowReader);
@@ -142,7 +143,7 @@ class ValueFormatterTest {
     }
 
     private void withDiveFixtureReader(DiveReaderCase testCase) throws Exception {
-        Path file = Path.of(getClass().getResource("/dive_screenshots_fixture.parquet").getPath());
+        Path file = TestResources.path("/dive_screenshots_fixture.parquet");
         try (ParquetFileReader fileReader = ParquetFileReader.open(InputFile.of(file));
              RowReader rowReader = fileReader.rowReader()) {
             testCase.run(rowReader, fileReader.getFileSchema());
@@ -789,7 +790,7 @@ class ValueFormatterTest {
 
     @Test
     void int96RendersCanonicalTimestampAcrossEverySource() throws IOException {
-        Path file = Path.of(getClass().getResource("/int96_timestamp_test.parquet").getPath());
+        Path file = TestResources.path("/int96_timestamp_test.parquet");
         try (ParquetFileReader fileReader = ParquetFileReader.open(InputFile.of(file));
              RowReader rowReader = fileReader.rowReader()) {
             FileSchema schema = fileReader.getFileSchema();
@@ -809,7 +810,7 @@ class ValueFormatterTest {
 
     @Test
     void int96PhysicalModeRendersHexAcrossEverySource() throws IOException {
-        Path file = Path.of(getClass().getResource("/int96_timestamp_test.parquet").getPath());
+        Path file = TestResources.path("/int96_timestamp_test.parquet");
         try (ParquetFileReader fileReader = ParquetFileReader.open(InputFile.of(file));
              RowReader rowReader = fileReader.rowReader()) {
             FileSchema schema = fileReader.getFileSchema();
@@ -830,7 +831,7 @@ class ValueFormatterTest {
     /// the value comes from: a row, a dictionary entry, a materialised value and a statistics bound.
     @Test
     void flba12TimestampRendersTheSameAcrossEverySource() throws IOException {
-        Path file = Path.of(getClass().getResource("/flba12_timestamp_test.parquet").getPath());
+        Path file = TestResources.path("/flba12_timestamp_test.parquet");
         try (ParquetFileReader fileReader = ParquetFileReader.open(InputFile.of(file));
              RowReader rowReader = fileReader.rowReader()) {
             FileSchema schema = fileReader.getFileSchema();

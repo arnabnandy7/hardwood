@@ -13,6 +13,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import dev.hardwood.InputFile;
+import dev.hardwood.cli.TestResources;
 import dev.hardwood.metadata.ColumnChunk;
 import dev.hardwood.metadata.ColumnIndex;
 import dev.hardwood.metadata.ColumnMetaData;
@@ -52,7 +53,7 @@ class LevelSummaryTest {
     }
 
     private static FileSchema fixtureSchema(String resource) throws Exception {
-        Path file = Path.of(LevelSummaryTest.class.getResource(resource).toURI());
+        Path file = TestResources.path(resource);
         try (ParquetFileReader reader = ParquetFileReader.open(InputFile.of(file))) {
             return reader.getFileSchema();
         }
@@ -72,7 +73,7 @@ class LevelSummaryTest {
     }
 
     private static ColumnMetaData chunkMetaData(String resource, String dottedName) throws Exception {
-        Path file = Path.of(LevelSummaryTest.class.getResource(resource).toURI());
+        Path file = TestResources.path(resource);
         try (ParquetFileReader reader = ParquetFileReader.open(InputFile.of(file))) {
             for (ColumnChunk chunk : reader.getFileMetaData().rowGroups().get(0).columns()) {
                 if (chunk.metaData().pathInSchema().matchesDottedName(dottedName)) {

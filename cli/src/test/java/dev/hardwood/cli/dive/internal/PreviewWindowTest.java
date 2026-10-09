@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 
 import dev.hardwood.InputFile;
+import dev.hardwood.cli.TestResources;
 import dev.hardwood.cli.dive.ParquetModel;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,7 +30,7 @@ class PreviewWindowTest {
 
     /// 3 row groups of 100 rows each: id 1..100, 101..200, 201..300.
     private static Path fixture() {
-        return Path.of(PreviewWindowTest.class.getResource("/filter_pushdown_int.parquet").getPath());
+        return TestResources.path("/filter_pushdown_int.parquet");
     }
 
     /// A binary payload renders as hex wherever it sits — top level or nested
@@ -37,7 +38,7 @@ class PreviewWindowTest {
     /// The screen caps the cell afterwards, as it does for any long value.
     @Test
     void binaryRendersAsHexAtEveryNestingPosition() throws IOException {
-        Path path = Path.of(PreviewWindowTest.class.getResource("/nested_binary_test.parquet").getPath());
+        Path path = TestResources.path("/nested_binary_test.parquet");
         String hex = "0x010100000000000000005366c0f71622f0fa1955c0";
 
         try (ParquetModel model = ParquetModel.open(InputFile.of(path), "nested_binary_test.parquet")) {
@@ -63,7 +64,7 @@ class PreviewWindowTest {
     /// has no expanded form of its own. The row is bounded; the modal is not.
     @Test
     void theRecordModalShowsAVariantBinaryPayloadWhole() throws IOException {
-        Path path = Path.of(PreviewWindowTest.class.getResource("/nested_binary_test.parquet").getPath());
+        Path path = TestResources.path("/nested_binary_test.parquet");
 
         try (ParquetModel model = ParquetModel.open(InputFile.of(path), "nested_binary_test.parquet")) {
             PreviewWindow.Slice slice = new PreviewWindow().slice(model, 0, 1, true);

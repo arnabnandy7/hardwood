@@ -10,7 +10,6 @@ package dev.hardwood.cli.command;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,6 +17,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+
+import dev.hardwood.cli.TestResources;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -39,8 +40,7 @@ class CorruptFileReportingTest {
     static void writeCorruptFile() throws IOException {
         // A valid file with its trailing magic overwritten: the smallest corruption every
         // command meets at the same place, when it opens the file.
-        Path source = Paths.get(
-                CorruptFileReportingTest.class.getResource("/plain_uncompressed.parquet").getPath());
+        Path source = TestResources.path("/plain_uncompressed.parquet");
         byte[] bytes = Files.readAllBytes(source);
         for (int i = bytes.length - 4; i < bytes.length; i++) {
             bytes[i] = 'X';

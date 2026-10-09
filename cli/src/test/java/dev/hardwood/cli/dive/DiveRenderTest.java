@@ -27,6 +27,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import dev.hardwood.InputFile;
 import dev.hardwood.OutputFile;
+import dev.hardwood.cli.TestResources;
 import dev.hardwood.cli.dive.internal.ColumnChunkDetailScreen;
 import dev.hardwood.cli.dive.internal.DataPreviewScreen;
 import dev.hardwood.cli.dive.internal.FooterScreen;
@@ -69,7 +70,7 @@ class DiveRenderTest {
     @BeforeEach
     void setUp() throws Exception {
         Keys.resetObservedGeometry();
-        Path path = Path.of(getClass().getResource("/column_index_pushdown.parquet").getPath());
+        Path path = TestResources.path("/column_index_pushdown.parquet");
         model = ParquetModel.open(InputFile.of(path), path.toString());
     }
 
@@ -99,7 +100,7 @@ class DiveRenderTest {
         // Chrome.renderBreadcrumb. To avoid pulling DiveApp into this
         // test we assert via direct breadcrumb-label calls on the
         // chrome utility, exercising the same switch.
-        Path file = Path.of(getClass().getResource("/dictionary_with_crc.parquet").getPath());
+        Path file = TestResources.path("/dictionary_with_crc.parquet");
         try (ParquetModel m = ParquetModel.open(InputFile.of(file), file.toString())) {
             NavigationStack stack = new NavigationStack(ScreenState.Overview.initial());
             stack.push(new ScreenState.RowGroups(0));
@@ -188,7 +189,7 @@ class DiveRenderTest {
 
     @Test
     void longValueFixtureMarksPagesStatistics() throws Exception {
-        Path path = Path.of(getClass().getResource("/cli_long_value_test.parquet").getPath());
+        Path path = TestResources.path("/cli_long_value_test.parquet");
         try (ParquetModel longValueModel = ParquetModel.open(InputFile.of(path), path.toString())) {
             RenderHarness.RenderedFrame frame = RenderHarness.render(
                     new Rect(0, 0, 120, 40), new ScreenState.Pages(0, 0, 1, false, true), longValueModel);
@@ -199,7 +200,7 @@ class DiveRenderTest {
 
     @Test
     void longValueFixtureMarksColumnIndexStatisticsAndModalShowsFullValue() throws Exception {
-        Path path = Path.of(getClass().getResource("/cli_long_value_test.parquet").getPath());
+        Path path = TestResources.path("/cli_long_value_test.parquet");
         try (ParquetModel longValueModel = ParquetModel.open(InputFile.of(path), path.toString())) {
             ScreenState.ColumnIndexView cell = new ScreenState.ColumnIndexView(
                     0, 0, 0, "", false, true, false);
@@ -216,7 +217,7 @@ class DiveRenderTest {
 
     @Test
     void longValueFixtureMarksColumnAcrossRowGroupsStatistics() throws Exception {
-        Path path = Path.of(getClass().getResource("/cli_long_value_test.parquet").getPath());
+        Path path = TestResources.path("/cli_long_value_test.parquet");
         try (ParquetModel longValueModel = ParquetModel.open(InputFile.of(path), path.toString())) {
             RenderHarness.RenderedFrame frame = RenderHarness.render(
                     new Rect(0, 0, 120, 40),
@@ -233,7 +234,7 @@ class DiveRenderTest {
     @ParameterizedTest
     @ValueSource(ints = {173, 175})
     void columnAcrossRowGroupsKeepsItsMarkerAtTheCellBoundary(int width) throws Exception {
-        Path path = Path.of(getClass().getResource("/cli_long_value_test.parquet").getPath());
+        Path path = TestResources.path("/cli_long_value_test.parquet");
         try (ParquetModel longValueModel = ParquetModel.open(InputFile.of(path), path.toString())) {
             RenderHarness.RenderedFrame frame = RenderHarness.render(
                     new Rect(0, 0, width, 40),
@@ -252,7 +253,7 @@ class DiveRenderTest {
     @ParameterizedTest
     @ValueSource(ints = {194, 196})
     void pagesKeepsItsMarkerAtTheCellBoundary(int width) throws Exception {
-        Path path = Path.of(getClass().getResource("/cli_long_value_test.parquet").getPath());
+        Path path = TestResources.path("/cli_long_value_test.parquet");
         try (ParquetModel longValueModel = ParquetModel.open(InputFile.of(path), path.toString())) {
             RenderHarness.RenderedFrame frame = RenderHarness.render(
                     new Rect(0, 0, width, 40),
@@ -270,7 +271,7 @@ class DiveRenderTest {
     @ParameterizedTest
     @ValueSource(ints = {70, 78, 80, 84})
     void columnIndexKeepsItsMarkerAtNarrowWidths(int width) throws Exception {
-        Path path = Path.of(getClass().getResource("/cli_long_value_test.parquet").getPath());
+        Path path = TestResources.path("/cli_long_value_test.parquet");
         try (ParquetModel longValueModel = ParquetModel.open(InputFile.of(path), path.toString())) {
             RenderHarness.RenderedFrame frame = RenderHarness.render(
                     new Rect(0, 0, width, 30),
@@ -282,7 +283,7 @@ class DiveRenderTest {
 
     @Test
     void unicodeValueTruncationDoesNotSplitSurrogatePairs() throws Exception {
-        Path path = Path.of(getClass().getResource("/cli_unicode_value_test.parquet").getPath());
+        Path path = TestResources.path("/cli_unicode_value_test.parquet");
         try (ParquetModel unicodeModel = ParquetModel.open(InputFile.of(path), path.toString())) {
             Rect area = new Rect(0, 0, 120, 40);
             RenderHarness.RenderedFrame pages = RenderHarness.render(
@@ -301,7 +302,7 @@ class DiveRenderTest {
         // one of the visible columns, so long values must be truncated.
         // The yellow_tripdata fixture has TIMESTAMP and DECIMAL columns
         // wider than the per-cell budget at this viewport.
-        Path file = Path.of(getClass().getResource("/yellow_tripdata_sample.parquet").getPath());
+        Path file = TestResources.path("/yellow_tripdata_sample.parquet");
         try (ParquetModel m = ParquetModel.open(InputFile.of(file), file.toString())) {
             ScreenState.DataPreview state = dev.hardwood.cli.dive.internal.DataPreviewScreen
                     .initialState(m, 10);
@@ -377,7 +378,7 @@ class DiveRenderTest {
         // A column clipped by the remaining width budget — as opposed to one
         // capped at VALUE_TRUNCATE — must always be reachable in full by
         // scrolling right, including when it is the file's last column.
-        Path file = Path.of(getClass().getResource("/yellow_tripdata_sample.parquet").getPath());
+        Path file = TestResources.path("/yellow_tripdata_sample.parquet");
         try (ParquetModel m = ParquetModel.open(InputFile.of(file), file.toString())) {
             NavigationStack stack = new NavigationStack(ScreenState.Overview.initial());
             stack.push(DataPreviewScreen.initialState(m, 5));
@@ -686,7 +687,7 @@ class DiveRenderTest {
     @MethodSource("smokeMatrix")
     void screenRendersWithoutException(String fixture, String screenName,
                                        Function<ParquetModel, ScreenState> ctor) throws Exception {
-        Path file = Path.of(getClass().getResource("/" + fixture).getPath());
+        Path file = TestResources.path("/" + fixture);
         try (ParquetModel m = ParquetModel.open(InputFile.of(file), file.toString())) {
             ScreenState s = ctor.apply(m);
             if (s == null) {
@@ -857,7 +858,7 @@ class DiveRenderTest {
 
     private static RenderHarness.RenderedFrame renderSizeStatistics(String dottedName, boolean levels)
             throws Exception {
-        Path path = Path.of(DiveRenderTest.class.getResource("/dive_screenshots_fixture.parquet").toURI());
+        Path path = TestResources.path("/dive_screenshots_fixture.parquet");
         try (ParquetModel sizeStatsModel = ParquetModel.open(InputFile.of(path), path.toString())) {
             return RenderHarness.render(AREA, new ScreenState.ColumnChunkDetail(
                     0, columnIndexOf(sizeStatsModel, dottedName),
@@ -870,7 +871,7 @@ class DiveRenderTest {
     /// spends a keystroke finding out.
     @Test
     void menuHintsAnnotatePageLevelSizeStatisticsWhenPresent() throws Exception {
-        Path path = Path.of(getClass().getResource("/size_statistics_test.parquet").toURI());
+        Path path = TestResources.path("/size_statistics_test.parquet");
         try (ParquetModel pageIndexModel = ParquetModel.open(InputFile.of(path), path.toString())) {
             RenderHarness.RenderedFrame frame = RenderHarness.render(AREA,
                     new ScreenState.ColumnChunkDetail(0, columnIndexOf(pageIndexModel, "name"),
@@ -900,7 +901,7 @@ class DiveRenderTest {
     /// opposite `present` rather than as a missing quantity.
     @Test
     void menuHintsSeparateAnAbsentCountFromAStructureThatIsNotThere() throws Exception {
-        Path path = Path.of(getClass().getResource("/plain_uncompressed.parquet").toURI());
+        Path path = TestResources.path("/plain_uncompressed.parquet");
         try (ParquetModel plainModel = ParquetModel.open(InputFile.of(path), path.toString())) {
             RenderHarness.RenderedFrame frame = RenderHarness.render(AREA,
                     new ScreenState.ColumnChunkDetail(0, 0,
@@ -983,7 +984,7 @@ class DiveRenderTest {
     /// from, so showing it a second time would restate the row above it.
     @Test
     void columnChunkDetailDropsTheDeclaredListWithoutEncodingStats() throws Exception {
-        Path path = Path.of(getClass().getResource("/geospatial_e2e_test.parquet").toURI());
+        Path path = TestResources.path("/geospatial_e2e_test.parquet");
         try (ParquetModel plainModel = ParquetModel.open(InputFile.of(path), path.toString())) {
             RenderHarness.RenderedFrame frame = RenderHarness.render(AREA,
                     new ScreenState.ColumnChunkDetail(0, columnIndexOf(plainModel, "city_name"),
@@ -999,7 +1000,7 @@ class DiveRenderTest {
     /// the present-value count taken from the same place.
     @Test
     void columnChunkDetailReportsZeroNullsForARequiredColumnWithoutStatistics() throws Exception {
-        Path path = Path.of(getClass().getResource("/geospatial_e2e_test.parquet").toURI());
+        Path path = TestResources.path("/geospatial_e2e_test.parquet");
         try (ParquetModel plainModel = ParquetModel.open(InputFile.of(path), path.toString())) {
             RenderHarness.RenderedFrame frame = RenderHarness.render(AREA,
                     new ScreenState.ColumnChunkDetail(0, columnIndexOf(plainModel, "city_name"),
@@ -1069,7 +1070,7 @@ class DiveRenderTest {
 
     @Test
     void levelsKeyIsAdvertisedOnlyForAChunkWithAHistogram() throws Exception {
-        Path path = Path.of(getClass().getResource("/dive_screenshots_fixture.parquet").toURI());
+        Path path = TestResources.path("/dive_screenshots_fixture.parquet");
         try (ParquetModel sizeStatsModel = ParquetModel.open(InputFile.of(path), path.toString())) {
             assertThat(keybarFor(sizeStatsModel, "websites.list.element")).contains("[l] levels");
             // Size statistics, but both histograms empty.
@@ -1085,7 +1086,7 @@ class DiveRenderTest {
     /// pane from a complete one.
     @Test
     void columnChunkDetailScrollsTheFactsPaneWhenItOverflows() throws Exception {
-        Path path = Path.of(getClass().getResource("/dive_screenshots_fixture.parquet").toURI());
+        Path path = TestResources.path("/dive_screenshots_fixture.parquet");
         try (ParquetModel model = ParquetModel.open(InputFile.of(path), path.toString())) {
             int column = columnIndexOf(model, "names.common.key_value.value");
             Rect shortArea = new Rect(0, 0, 120, 24);
@@ -1111,7 +1112,7 @@ class DiveRenderTest {
     /// that content is hidden, not decoration.
     @Test
     void columnChunkDetailOmitsTheRangeWhenEverythingFits() throws Exception {
-        Path path = Path.of(getClass().getResource("/dive_screenshots_fixture.parquet").toURI());
+        Path path = TestResources.path("/dive_screenshots_fixture.parquet");
         try (ParquetModel model = ParquetModel.open(InputFile.of(path), path.toString())) {
             RenderHarness.RenderedFrame frame = RenderHarness.render(new Rect(0, 0, 120, 60),
                     new ScreenState.ColumnChunkDetail(0, columnIndexOf(model, "metric_a"),
@@ -1168,7 +1169,7 @@ class DiveRenderTest {
     /// boundary is dropped whole rather than split mid-surrogate.
     @Test
     void dictionaryPreviewTruncatesByDisplayCell() throws Exception {
-        Path file = Path.of(getClass().getResource("/cli_wide_value_test.parquet").getPath());
+        Path file = TestResources.path("/cli_wide_value_test.parquet");
         try (ParquetModel m = ParquetModel.open(InputFile.of(file), file.toString())) {
             RenderHarness.RenderedFrame frame = RenderHarness.render(AREA,
                     new ScreenState.DictionaryView(0, 0, 0, false, "", false, true, true), m);
@@ -1185,7 +1186,7 @@ class DiveRenderTest {
     /// value ends with its marker inside the 32-cell value column.
     @Test
     void overviewKeyValueValueTruncatesByDisplayCell() throws Exception {
-        Path file = Path.of(getClass().getResource("/cli_wide_value_test.parquet").getPath());
+        Path file = TestResources.path("/cli_wide_value_test.parquet");
         try (ParquetModel m = ParquetModel.open(InputFile.of(file), file.toString())) {
             RenderHarness.RenderedFrame frame = RenderHarness.render(AREA, ScreenState.Overview.initial(), m);
 
@@ -1200,7 +1201,7 @@ class DiveRenderTest {
     /// and an entry with no value renders the absent marker.
     @Test
     void overviewKeyValueValueIsSanitisedAndAbsentIsMarked() throws Exception {
-        Path file = Path.of(getClass().getResource("/cli_info_kv_metadata_test.parquet").getPath());
+        Path file = TestResources.path("/cli_info_kv_metadata_test.parquet");
         try (ParquetModel m = ParquetModel.open(InputFile.of(file), file.toString())) {
             RenderHarness.RenderedFrame frame = RenderHarness.render(AREA, ScreenState.Overview.initial(), m);
 
@@ -1212,7 +1213,7 @@ class DiveRenderTest {
 
     @Test
     void overviewKeyValueKeyIsSanitised() throws Exception {
-        Path file = Path.of(getClass().getResource("/cli_wide_value_test.parquet").getPath());
+        Path file = TestResources.path("/cli_wide_value_test.parquet");
         try (ParquetModel m = ParquetModel.open(InputFile.of(file), file.toString())) {
             RenderHarness.RenderedFrame frame = RenderHarness.render(AREA, ScreenState.Overview.initial(), m);
 
@@ -1225,7 +1226,7 @@ class DiveRenderTest {
         // The facts pane moved a cursor it never scrolled to, so on a short
         // terminal the selected entry could sit below the fold while the
         // keybar still offered Enter to open it.
-        Path file = Path.of(getClass().getResource("/cli_info_kv_metadata_test.parquet").getPath());
+        Path file = TestResources.path("/cli_info_kv_metadata_test.parquet");
         try (ParquetModel m = ParquetModel.open(InputFile.of(file), file.toString())) {
             Rect area = new Rect(0, 0, 120, 12);
             NavigationStack stack = new NavigationStack(new ScreenState.Overview(
@@ -1265,7 +1266,7 @@ class DiveRenderTest {
         // The cursor was re-snapped to the first enabled entry on every
         // keypress, so on a chunk with only Pages and Dictionary populated it
         // moved onto Column index and was dragged straight back.
-        Path file = Path.of(getClass().getResource("/yellow_tripdata_sample.parquet").getPath());
+        Path file = TestResources.path("/yellow_tripdata_sample.parquet");
         try (ParquetModel m = ParquetModel.open(InputFile.of(file), file.toString())) {
             NavigationStack stack = new NavigationStack(ScreenState.Overview.initial());
             stack.push(ColumnChunkDetailScreen.initialState(m, 0, 0, true));
@@ -1288,7 +1289,7 @@ class DiveRenderTest {
         // Recomputing the window from the cursor pinned it to the bottom row,
         // so every step up dragged the whole pane along instead of walking the
         // cursor to the top of the window first, as the list screens do.
-        Path file = Path.of(getClass().getResource("/yellow_tripdata_sample.parquet").getPath());
+        Path file = TestResources.path("/yellow_tripdata_sample.parquet");
         try (ParquetModel m = ParquetModel.open(InputFile.of(file), file.toString())) {
             Keys.resetObservedGeometry();
             Rect area = new Rect(0, 0, 110, 10);
@@ -1319,7 +1320,7 @@ class DiveRenderTest {
         // The window only ever slid far enough to reveal the cursor, and this
         // cursor cannot reach the facts — so once the list had pushed them off
         // the top, walking back up did not bring them back.
-        Path file = Path.of(getClass().getResource("/cli_info_kv_metadata_test.parquet").getPath());
+        Path file = TestResources.path("/cli_info_kv_metadata_test.parquet");
         try (ParquetModel m = ParquetModel.open(InputFile.of(file), file.toString())) {
             Keys.resetObservedGeometry();
             Rect area = new Rect(0, 0, 110, 12);
@@ -1363,7 +1364,7 @@ class DiveRenderTest {
         // The cursor stopped only on anchors, and the anchors sit in the
         // lower half of the body, so the rows above the topmost one could not
         // be visited at all.
-        Path file = Path.of(getClass().getResource("/yellow_tripdata_sample.parquet").getPath());
+        Path file = TestResources.path("/yellow_tripdata_sample.parquet");
         try (ParquetModel m = ParquetModel.open(InputFile.of(file), file.toString())) {
             Keys.resetObservedGeometry();
             Rect area = new Rect(0, 0, 110, 14);
@@ -1396,7 +1397,7 @@ class DiveRenderTest {
         // The facts above the key/value list were pinned and only the list
         // was windowed, so on a short pane whatever they pushed past the
         // bottom could not be reached.
-        Path file = Path.of(getClass().getResource("/cli_info_kv_metadata_test.parquet").getPath());
+        Path file = TestResources.path("/cli_info_kv_metadata_test.parquet");
         try (ParquetModel m = ParquetModel.open(InputFile.of(file), file.toString())) {
             Keys.resetObservedGeometry();
             Rect area = new Rect(0, 0, 110, 12);
@@ -1424,7 +1425,7 @@ class DiveRenderTest {
         // The schema tree moved its cursor and rendered from row zero, so on
         // any file with more columns than the viewport the cursor left the
         // screen — while the title reported a range the body did not show.
-        Path file = Path.of(getClass().getResource("/yellow_tripdata_sample.parquet").getPath());
+        Path file = TestResources.path("/yellow_tripdata_sample.parquet");
         try (ParquetModel m = ParquetModel.open(InputFile.of(file), file.toString())) {
             Rect area = new Rect(0, 0, 120, 12);
             NavigationStack stack = new NavigationStack(ScreenState.Overview.initial());
@@ -1466,7 +1467,7 @@ class DiveRenderTest {
     void keyValueModalPagesWithPageDownAsWellAsShift() throws Exception {
         // The modal recognised only Shift+↑/↓, so PgDn did nothing there while
         // it paged on every other scrollable pane.
-        Path file = Path.of(getClass().getResource("/cli_info_kv_metadata_test.parquet").getPath());
+        Path file = TestResources.path("/cli_info_kv_metadata_test.parquet");
         try (ParquetModel m = ParquetModel.open(InputFile.of(file), file.toString())) {
             Rect area = new Rect(0, 0, 120, 14);
             ScreenState.Overview open = new ScreenState.Overview(

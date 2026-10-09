@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import dev.hardwood.InputFile;
+import dev.hardwood.cli.TestResources;
 import dev.hardwood.cli.dive.internal.Keys;
 import dev.hardwood.metadata.ColumnMetaData;
 import dev.tamboui.buffer.Buffer;
@@ -59,7 +60,7 @@ class DiveReadFailureTest {
     }
 
     private void damage(String fixture, ToLongFunction<ParquetModel> region, int count) throws Exception {
-        Path source = Path.of(getClass().getResource(fixture).getPath());
+        Path source = TestResources.path(fixture);
         byte[] bytes = Files.readAllBytes(source);
 
         long at;
@@ -266,7 +267,7 @@ class DiveReadFailureTest {
     /// parse error, which is a different set of types for the guard to hold.
     @Test
     void aDamagedPageBodyIsReportedRatherThanFatal() throws Exception {
-        Path source = Path.of(getClass().getResource("/column_index_pushdown_dict.parquet").getPath());
+        Path source = TestResources.path("/column_index_pushdown_dict.parquet");
         byte[] bytes = Files.readAllBytes(source);
         long bodyStart;
         try (ParquetModel intact = ParquetModel.open(InputFile.of(source), source.toString())) {

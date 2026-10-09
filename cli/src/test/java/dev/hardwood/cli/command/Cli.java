@@ -12,6 +12,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 
 import dev.hardwood.cli.Main;
+import dev.hardwood.cli.TestResources;
 
 /// In-process launcher for CLI command tests. Drives the same [Main.run] entry
 /// point the binary uses — including its exit-code mapping — with stdout and
@@ -19,6 +20,11 @@ import dev.hardwood.cli.Main;
 final class Cli {
 
     private Cli() {
+    }
+
+    /// The path of a test resource, in the form a user passes to `-f`.
+    static String file(String resource) {
+        return TestResources.path(resource).toString();
     }
 
     static Result launch(String... args) {
@@ -39,8 +45,8 @@ final class Cli {
         }
 
         return new Result(exitCode,
-                stripTrailingNewlines(outBuf.toString(StandardCharsets.UTF_8)),
-                stripTrailingNewlines(errBuf.toString(StandardCharsets.UTF_8)));
+                stripTrailingNewlines(outBuf.toString(StandardCharsets.UTF_8)).replace("\r\n", "\n"),
+                stripTrailingNewlines(errBuf.toString(StandardCharsets.UTF_8)).replace("\r\n", "\n"));
     }
 
     private static String stripTrailingNewlines(String s) {

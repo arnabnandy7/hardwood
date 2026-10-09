@@ -28,17 +28,17 @@ class InspectDictionaryCommandTest implements InspectDictionaryCommandContract {
 
     @Override
     public String plainFile() {
-        return getClass().getResource("/plain_uncompressed.parquet").getPath();
+        return Cli.file("/plain_uncompressed.parquet");
     }
 
     @Override
     public String dictFile() {
-        return getClass().getResource("/dictionary_uncompressed.parquet").getPath();
+        return Cli.file("/dictionary_uncompressed.parquet");
     }
 
     @Override
     public String longValueFile() {
-        return getClass().getResource("/cli_long_value_test.parquet").getPath();
+        return Cli.file("/cli_long_value_test.parquet");
     }
 
     @Override

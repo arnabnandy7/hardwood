@@ -16,6 +16,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import dev.hardwood.InputFile;
+import dev.hardwood.cli.TestResources;
 import dev.hardwood.internal.metadata.PageHeader;
 import dev.hardwood.internal.reader.PageFormatProbe;
 import dev.hardwood.internal.thrift.ThriftCompactConstants;
@@ -31,8 +32,7 @@ class PageHeaderWalkTest {
 
     /// One row group, 10 000 rows; column 1 (`category`) is dictionary-encoded, with several
     /// data pages.
-    private static final Path FIXTURE = Path.of(PageHeaderWalkTest.class
-            .getResource("/column_index_pushdown_dict.parquet").getPath());
+    private static final Path FIXTURE = TestResources.path("/column_index_pushdown_dict.parquet");
 
     /// A window smaller than a page makes headers straddle window ends and bodies span several
     /// windows; the walk must find the same headers as one read of the whole chunk.
