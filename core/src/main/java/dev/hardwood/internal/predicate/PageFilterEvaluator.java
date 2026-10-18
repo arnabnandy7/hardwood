@@ -20,6 +20,7 @@ import dev.hardwood.metadata.ColumnMetaData;
 import dev.hardwood.metadata.OffsetIndex;
 import dev.hardwood.metadata.PageLocation;
 import dev.hardwood.metadata.RowGroup;
+import dev.hardwood.reader.FilterPredicate.Operator;
 import dev.hardwood.reader.ParquetReadException;
 
 /// Evaluates a [ResolvedPredicate] against per-page statistics from the Column Index
@@ -116,13 +117,165 @@ public class PageFilterEvaluator {
         int pageCount = pages.size();
         boolean[] keep = new boolean[pageCount];
 
-        for (int i = 0; i < pageCount; i++) {
+        PageRange candidates = orderedCandidates(columnIdx, leaf, readability);
+        int first = candidates == null ? 0 : candidates.first();
+        int end = candidates == null ? pageCount : candidates.end();
+        for (int i = first; i < end; i++) {
             UnitStats page = UnitStats.IndexPageStats.of(columnIdx, pages, i, rowCount, readability);
             keep[i] = page.decide(leaf, columnContext) != FilterDecision.CANNOT_MATCH;
         }
 
         return RowRanges.fromPages(pages, keep, rowCount);
     }
+
+    /// The contiguous page span an ordered Column Index says may match `leaf`, or `null` when
+    /// the index or predicate does not support a sound binary search. The returned span is only
+    /// a candidate: pages inside it still take the ordinary [UnitStats#decide] path above.
+    private static PageRange orderedCandidates(ColumnIndex columnIndex, ResolvedPredicate leaf,
+            BoundsReadability readability) {
+        int pageCount = columnIndex.getPageCount();
+        if (pageCount == 0 || columnIndex.boundaryOrder() == ColumnIndex.BoundaryOrder.UNORDERED
+                || orderedOperator(leaf) == null || floatingPoint(leaf)) {
+            return null;
+        }
+        // BoundaryOrder says nothing about where null-only pages sit. Their min/max entries are
+        // placeholders rather than bounds, so even one makes the linear decision path necessary.
+        for (boolean nullPage : columnIndex.nullPages()) {
+            if (nullPage) {
+                return null;
+            }
+        }
+
+        OrderedSearch search = new OrderedSearch(columnIndex, leaf, readability);
+        boolean ascending = columnIndex.boundaryOrder() == ColumnIndex.BoundaryOrder.ASCENDING;
+        Operator operator = orderedOperator(leaf);
+        PageRange result = switch (operator) {
+            case EQ -> ascending
+                    ? new PageRange(search.firstFalse(0, pageCount, SearchTest.BEFORE),
+                            search.firstTrue(0, pageCount, SearchTest.AFTER))
+                    : new PageRange(search.firstFalse(0, pageCount, SearchTest.AFTER),
+                            search.firstTrue(0, pageCount, SearchTest.BEFORE));
+            case LT, LT_EQ -> ascending
+                    ? new PageRange(0, search.firstTrue(0, pageCount, SearchTest.ORIGINAL))
+                    : new PageRange(search.firstFalse(0, pageCount, SearchTest.ORIGINAL), pageCount);
+            case GT, GT_EQ -> ascending
+                    ? new PageRange(search.firstFalse(0, pageCount, SearchTest.ORIGINAL), pageCount)
+                    : new PageRange(0, search.firstTrue(0, pageCount, SearchTest.ORIGINAL));
+            case NOT_EQ -> null;
+        };
+        return search.usable() && result != null && result.first() <= result.end() ? result : null;
+    }
+
+    /// Operators whose non-matching pages form one or two ordered runs.
+    private static Operator orderedOperator(ResolvedPredicate leaf) {
+        return switch (leaf) {
+            case ResolvedPredicate.IntPredicate p -> p.op();
+            case ResolvedPredicate.LongPredicate p -> p.op();
+            case ResolvedPredicate.UnsignedIntPredicate p -> p.op();
+            case ResolvedPredicate.UnsignedLongPredicate p -> p.op();
+            case ResolvedPredicate.BooleanPredicate p -> p.op();
+            case ResolvedPredicate.BinaryPredicate p -> p.op();
+            default -> null;
+        };
+    }
+
+    /// Floating-point bounds do not cover NaN and therefore make no ordering promise over all
+    /// values a page may hold. Keep their existing linear, NaN-aware decisions.
+    private static boolean floatingPoint(ResolvedPredicate leaf) {
+        return leaf instanceof ResolvedPredicate.FloatPredicate
+                || leaf instanceof ResolvedPredicate.DoublePredicate
+                || leaf instanceof ResolvedPredicate.Float16Predicate;
+    }
+
+    /// The same scalar leaf with another operator, preserving its decoded literal and comparison.
+    private static ResolvedPredicate withOperator(ResolvedPredicate leaf, Operator operator) {
+        return switch (leaf) {
+            case ResolvedPredicate.IntPredicate p ->
+                    new ResolvedPredicate.IntPredicate(p.columnIndex(), operator, p.value());
+            case ResolvedPredicate.LongPredicate p ->
+                    new ResolvedPredicate.LongPredicate(p.columnIndex(), operator, p.value());
+            case ResolvedPredicate.UnsignedIntPredicate p ->
+                    new ResolvedPredicate.UnsignedIntPredicate(p.columnIndex(), operator, p.value());
+            case ResolvedPredicate.UnsignedLongPredicate p ->
+                    new ResolvedPredicate.UnsignedLongPredicate(p.columnIndex(), operator, p.value());
+            case ResolvedPredicate.BooleanPredicate p ->
+                    new ResolvedPredicate.BooleanPredicate(p.columnIndex(), operator, p.value());
+            case ResolvedPredicate.BinaryPredicate p ->
+                    new ResolvedPredicate.BinaryPredicate(p.columnIndex(), operator, p.value(), p.comparison());
+            default -> throw new IllegalArgumentException("Not an ordered scalar predicate: " + leaf);
+        };
+    }
+
+    private enum SearchTest {
+        ORIGINAL,
+        BEFORE,
+        AFTER
+    }
+
+    /// Binary-searches predicates over one ordered min/max list. A bound that [MinMaxStats]
+    /// refuses makes the whole attempt unusable; the caller then performs the linear scan.
+    private static final class OrderedSearch {
+
+        private final ColumnIndex columnIndex;
+        private final ResolvedPredicate leaf;
+        private final BoundsReadability readability;
+        private boolean usable = true;
+
+        private OrderedSearch(ColumnIndex columnIndex, ResolvedPredicate leaf,
+                BoundsReadability readability) {
+            this.columnIndex = columnIndex;
+            this.leaf = leaf;
+            this.readability = readability;
+        }
+
+        private int firstTrue(int from, int to, SearchTest test) {
+            while (from < to && usable) {
+                int middle = (from + to) >>> 1;
+                if (test(middle, test)) {
+                    to = middle;
+                }
+                else {
+                    from = middle + 1;
+                }
+            }
+            return from;
+        }
+
+        private int firstFalse(int from, int to, SearchTest test) {
+            while (from < to && usable) {
+                int middle = (from + to) >>> 1;
+                if (test(middle, test)) {
+                    from = middle + 1;
+                }
+                else {
+                    to = middle;
+                }
+            }
+            return from;
+        }
+
+        private boolean test(int pageIndex, SearchTest test) {
+            MinMaxStats stats = MinMaxStats.ofPage(columnIndex, pageIndex, leaf, readability);
+            if (stats instanceof MinMaxStats.NoBounds) {
+                usable = false;
+                return false;
+            }
+            ResolvedPredicate tested = switch (test) {
+                case ORIGINAL -> leaf;
+                // A page is before the literal when it cannot contain a value >= the literal;
+                // it is after when it cannot contain a value <= the literal.
+                case BEFORE -> withOperator(leaf, Operator.GT_EQ);
+                case AFTER -> withOperator(leaf, Operator.LT_EQ);
+            };
+            return stats.canDrop(tested);
+        }
+
+        private boolean usable() {
+            return usable;
+        }
+    }
+
+    private record PageRange(int first, int end) {}
 
     /// Parses one column chunk's `ColumnIndex` and `OffsetIndex` together.
     ///
