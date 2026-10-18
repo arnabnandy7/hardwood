@@ -173,7 +173,6 @@ public class PageFilterEvaluator {
             case ResolvedPredicate.LongPredicate p -> p.op();
             case ResolvedPredicate.UnsignedIntPredicate p -> p.op();
             case ResolvedPredicate.UnsignedLongPredicate p -> p.op();
-            case ResolvedPredicate.BooleanPredicate p -> p.op();
             case ResolvedPredicate.BinaryPredicate p -> p.op();
             default -> null;
         };
@@ -198,8 +197,6 @@ public class PageFilterEvaluator {
                     new ResolvedPredicate.UnsignedIntPredicate(p.columnIndex(), operator, p.value());
             case ResolvedPredicate.UnsignedLongPredicate p ->
                     new ResolvedPredicate.UnsignedLongPredicate(p.columnIndex(), operator, p.value());
-            case ResolvedPredicate.BooleanPredicate p ->
-                    new ResolvedPredicate.BooleanPredicate(p.columnIndex(), operator, p.value());
             case ResolvedPredicate.BinaryPredicate p ->
                     new ResolvedPredicate.BinaryPredicate(p.columnIndex(), operator, p.value(), p.comparison());
             default -> throw new IllegalArgumentException("Not an ordered scalar predicate: " + leaf);

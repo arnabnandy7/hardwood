@@ -12,11 +12,11 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.parquet.example.data.Group;
 import org.apache.parquet.example.data.simple.SimpleGroupFactory;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.example.ExampleParquetWriter;
+import org.apache.parquet.io.LocalOutputFile;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.MessageTypeParser;
 import org.junit.jupiter.api.BeforeAll;
@@ -47,9 +47,7 @@ class TotalOrderFloatReadTest {
         file = tmpDir.resolve("total_order_floats.parquet");
         MessageType schema = MessageTypeParser.parseMessageType(
                 "message schema { required float f; required double d; }");
-        org.apache.hadoop.fs.Path hadoopPath = new org.apache.hadoop.fs.Path(file.toUri());
-        try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(hadoopPath)
-                .withConf(new Configuration())
+        try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(new LocalOutputFile(file))
                 .withType(schema)
                 .build()) {
             SimpleGroupFactory factory = new SimpleGroupFactory(schema);

@@ -412,6 +412,20 @@ class PageFilterEvaluatorTest {
         );
     }
 
+    @Test
+    void orderedBooleanBoundsKeepTheLinearDecisionPath() {
+        ColumnIndex index = new ColumnIndex(new boolean[2],
+                List.of(new byte[]{ 0 }, new byte[]{ 0 }),
+                List.of(new byte[]{ 0 }, new byte[]{ 1 }),
+                ColumnIndex.BoundaryOrder.ASCENDING, null, null, null, null);
+
+        RowRanges ranges = evaluatePages(index, TWO_PAGE_OFFSET_INDEX, TWO_PAGE_ROW_COUNT,
+                new ResolvedPredicate.BooleanPredicate(0, Operator.EQ, true));
+
+        assertThat(ranges.overlapsPage(0, 50)).isFalse();
+        assertThat(ranges.overlapsPage(50, 100)).isTrue();
+    }
+
     // Binary Filtering Tests
 
     // 2 pages: [apple,banana], [cherry,date]
