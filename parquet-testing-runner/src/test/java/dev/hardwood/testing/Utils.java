@@ -27,7 +27,6 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.parquet.avro.AvroParquetReader;
 import org.apache.parquet.example.data.Group;
 import org.apache.parquet.example.data.simple.SimpleGroupFactory;
@@ -35,6 +34,7 @@ import org.apache.parquet.hadoop.ParquetReader;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.example.ExampleParquetWriter;
 import org.apache.parquet.hadoop.util.HadoopInputFile;
+import org.apache.parquet.io.LocalOutputFile;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.MessageTypeParser;
 import org.assertj.core.api.ThrowableAssert;
@@ -181,16 +181,8 @@ public class Utils {
         SharedFixture.produceOnce(repoDir.resolve("data/good_c.parquet"), output -> {
             MessageType schema = MessageTypeParser.parseMessageType(
                     "message schema { required int32 c; }");
-            Configuration conf = new Configuration();
-            // Hadoop's checksumming local filesystem writes a `.<name>.crc` sidecar,
-            // which would be orphaned when the file is renamed into place. None of the
-            // other fixtures carry one either.
-            conf.set("fs.file.impl", RawLocalFileSystem.class.getName());
-            org.apache.hadoop.fs.Path hadoopPath =
-                    new org.apache.hadoop.fs.Path(output.toUri());
             try (ParquetWriter<Group> writer = ExampleParquetWriter
-                    .builder(hadoopPath)
-                    .withConf(conf)
+                    .builder(new LocalOutputFile(output))
                     .withType(schema)
                     .build()) {
                 SimpleGroupFactory factory = new SimpleGroupFactory(schema);
