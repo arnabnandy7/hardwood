@@ -19,7 +19,7 @@
 Filter predicates apply at three levels, in this order:
 
 1. **Row group** — entire row groups whose statistics prove no rows can match are skipped. For `eq` and `in` predicates, a column's [Bloom filter](https://parquet.apache.org/docs/file-format/bloomfilter/) and, when the chunk's `encoding_stats` show every data page is dictionary-encoded, the column chunk's dictionary page also skip a row group that never stored the target. Dictionary pages are read only for a row group that statistics and the Bloom filter did not already drop.
-2. **Page** — within surviving row groups, the Column Index (per-page min/max statistics) is used to skip individual pages, avoiding unnecessary decompression and decoding. On remote backends like S3, only the matching pages are fetched.
+2. **Page** — within surviving row groups, the Column Index (per-page min/max statistics) is used to skip individual pages, avoiding unnecessary decompression and decoding. When the index declares its page bounds ascending or descending, equality and range predicates locate the candidate page span with binary search; unordered or unusable bounds retain the linear statistics scan. On remote backends like S3, only the matching pages are fetched.
 3. **Record** — `buildRowReader().filter(filter).build()` evaluates the predicate against each decoded row and returns only rows that match.
 
 In a row group whose statistics prove that every row matches, the predicate is not evaluated, and a filter column outside the projection is neither fetched nor decoded.
