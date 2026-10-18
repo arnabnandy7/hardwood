@@ -19,7 +19,6 @@ import org.apache.parquet.format.RowGroup;
 import org.apache.parquet.format.SizeStatistics;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.example.ExampleParquetWriter;
-import org.apache.parquet.io.LocalOutputFile;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.MessageTypeParser;
 import org.junit.jupiter.api.Test;
@@ -103,7 +102,7 @@ class WriterSizeStatisticsInteropTest {
         Path parquetJava = dir.resolve("parquet-java.parquet");
         SimpleGroupFactory groups = new SimpleGroupFactory(PARQUET_JAVA_SCHEMA);
         try (ParquetWriter<Group> writer = ExampleParquetWriter
-                .builder(new LocalOutputFile(parquetJava))
+                .builder(new org.apache.hadoop.fs.Path(parquetJava.toUri()))
                 .withConf(HadoopConf.DEFAULTS)
                 .withType(PARQUET_JAVA_SCHEMA)
                 .build()) {

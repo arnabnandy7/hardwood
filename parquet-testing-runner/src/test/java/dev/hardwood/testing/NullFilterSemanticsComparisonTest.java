@@ -23,7 +23,6 @@ import org.apache.parquet.hadoop.ParquetReader;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.example.ExampleParquetWriter;
 import org.apache.parquet.hadoop.util.HadoopInputFile;
-import org.apache.parquet.io.LocalOutputFile;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.MessageTypeParser;
 import org.junit.jupiter.api.BeforeAll;
@@ -64,7 +63,10 @@ class NullFilterSemanticsComparisonTest {
         parquetFile = tmpDir.resolve("null_filter_semantics.parquet");
         MessageType schema = MessageTypeParser.parseMessageType(
                 "message schema { optional int32 age; }");
-        try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(new LocalOutputFile(parquetFile))
+        Configuration conf = new Configuration();
+        org.apache.hadoop.fs.Path hadoopPath = new org.apache.hadoop.fs.Path(parquetFile.toUri());
+        try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(hadoopPath)
+                .withConf(conf)
                 .withType(schema)
                 .build()) {
             SimpleGroupFactory factory = new SimpleGroupFactory(schema);

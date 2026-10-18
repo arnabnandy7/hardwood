@@ -10,12 +10,12 @@ package dev.hardwood.testing;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.parquet.example.data.Group;
 import org.apache.parquet.example.data.simple.SimpleGroupFactory;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.example.ExampleParquetWriter;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
-import org.apache.parquet.io.LocalOutputFile;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.MessageTypeParser;
 import org.junit.jupiter.api.Tag;
@@ -47,7 +47,8 @@ class LargeFileReadTest {
 
         long written = 0;
         try (ParquetWriter<Group> writer = ExampleParquetWriter
-                .builder(new LocalOutputFile(output))
+                .builder(new org.apache.hadoop.fs.Path(output.toUri()))
+                .withConf(new Configuration())
                 .withType(schema)
                 .withCompressionCodec(CompressionCodecName.UNCOMPRESSED)
                 .withDictionaryEncoding(false) // PLAIN: ~8 bytes/row, so the file reliably exceeds 2 GB
