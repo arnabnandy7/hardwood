@@ -13,17 +13,17 @@
 
 See [GitHub Releases](https://github.com/hardwood-hq/hardwood/releases) for downloads and more information.
 
-## 1.1.0.Beta3 (2026-10-21)
-
-**Bug fixes:**
-
-- The native CLI rejects TLS certificates issued under intermediate CAs whose private keys have been compromised, including with a trust store passed via `-Djavax.net.ssl.trustStore` ([#1604](https://github.com/hardwood-hq/hardwood/issues/1604))
-
 ## 1.1.0.CR1 (unreleased)
 
 **Deprecations:**
 
 - `HardwoodContext.executor()` is deprecated for removal in the next major release, without a replacement ([#1581](https://github.com/hardwood-hq/hardwood/issues/1581))
+
+## 1.1.0.Beta3 (2026-10-21)
+
+**Bug fixes:**
+
+- The native CLI rejects TLS certificates issued under intermediate CAs whose private keys have been compromised, including with a trust store passed via `-Djavax.net.ssl.trustStore` ([#1604](https://github.com/hardwood-hq/hardwood/issues/1604))
 
 ## 1.1.0.Beta2 (2026-10-11)
 
