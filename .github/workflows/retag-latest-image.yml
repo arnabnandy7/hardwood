@@ -1,0 +1,47 @@
+#
+#  SPDX-License-Identifier: Apache-2.0
+#
+#  Copyright The original authors
+#
+#  Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
+#
+
+# Points the CLI image's latest tag at an existing release, for when a release
+# moved it to the wrong one (a fix release of an older line run with latest checked).
+name: Retag Latest Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      release-version:
+        description: 'Release whose image becomes latest (e.g. 1.1.0.Beta3)'
+        required: true
+
+jobs:
+  retag:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: 'Log in to GitHub Container Registry'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3.7.0 — https://github.com/docker/login-action/releases/tag/v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 'Set up Docker Buildx'
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3.12.0 — https://github.com/docker/setup-buildx-action/releases/tag/v3.12.0
+
+      - name: 'Point latest at the release image'
+        env:
+          VERSION: ${{ inputs.release-version }}
+          IMAGE: ghcr.io/${{ github.repository }}
+        run: |
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[A-Za-z]+[0-9]*$ ]]; then
+            echo "Not a release version: $VERSION" >&2
+            exit 1
+          fi
+          docker buildx imagetools inspect "$IMAGE:$VERSION"
+          docker buildx imagetools create --tag "$IMAGE:latest" "$IMAGE:$VERSION"
+          docker buildx imagetools inspect "$IMAGE:latest"
