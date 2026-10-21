@@ -29,6 +29,11 @@ on:
         required: true
         type: boolean
         default: true
+      latest:
+        description: 'Mark as the latest release (GitHub release and :latest image); uncheck for a fix release of an older line'
+        required: true
+        type: boolean
+        default: true
 
 jobs:
   release:
@@ -69,6 +74,7 @@ jobs:
       - name: 'Release'
         run: ./release.sh "${{ inputs.release-version }}" "${{ inputs.development-version }}" "${{ inputs.stage }}"
         env:
+          RELEASE_LATEST: ${{ inputs.latest }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           JRELEASER_MAVENCENTRAL_USERNAME: ${{ secrets.JRELEASER_MAVENCENTRAL_USERNAME }}
           JRELEASER_MAVENCENTRAL_TOKEN: ${{ secrets.JRELEASER_MAVENCENTRAL_TOKEN }}
@@ -103,3 +109,4 @@ jobs:
     uses: ./.github/workflows/release-cli.yml
     with:
       release-version: ${{ inputs.release-version }}
+      latest: ${{ inputs.latest }}

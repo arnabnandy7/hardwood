@@ -176,7 +176,9 @@ if [[ -n "$ORIGIN_URL" ]]; then
   git remote remove origin 2>/dev/null || true
   git remote add origin "$ORIGIN_URL"
 fi
-./mvnw -ntp -B -N -Ppublication jreleaser:release
+# A fix release of an older line must not become GitHub's latest release.
+if [[ "${RELEASE_LATEST:-true}" == "true" ]]; then MAKE_LATEST=TRUE; else MAKE_LATEST=FALSE; fi
+./mvnw -ntp -B -N -Ppublication jreleaser:release -Djreleaser.makeLatest="${MAKE_LATEST}"
 popd > /dev/null
 
 # -- Verify staged release (UPLOAD only) -------------------------------------

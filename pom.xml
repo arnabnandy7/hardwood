@@ -65,6 +65,8 @@
 
   <properties>
     <auto-service.version>1.1.1</auto-service.version>
+    <!-- Whether JReleaser marks the GitHub release as the latest; release.sh sets it per release. -->
+    <jreleaser.makeLatest>TRUE</jreleaser.makeLatest>
     <error-prone.version>2.49.0</error-prone.version>
     <hadoop.version>3.4.3</hadoop.version>
     <japicmp.newVersion>${project.version}</japicmp.newVersion>
@@ -687,6 +689,7 @@
                 <release>
                   <github>
                     <overwrite>true</overwrite>
+                    <makeLatest>${jreleaser.makeLatest}</makeLatest>
                     <changelog>
                       <formatted>ALWAYS</formatted>
                       <contributors>

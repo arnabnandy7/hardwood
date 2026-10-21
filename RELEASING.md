@@ -58,6 +58,7 @@ Trigger the `Release` workflow from the GitHub Actions UI with the following inp
 - **Release version**: The version to release (e.g., `1.0.0`)
 - **Development version**: The next snapshot version (e.g., `1.1.0-SNAPSHOT`)
 - **Stage**: `UPLOAD` to upload the release to the deploy to the Maven Central portal (you can examine it at https://central.sonatype.com/publishing/deployments then), or `FULL` to publish directly to Maven Central
+- **Latest**: whether the GitHub release becomes the repository's latest release and the CLI image is tagged `latest`; leave checked unless the release is a fix of an older line
 
 To test a staged release, check out the release tag and run:
 
@@ -81,8 +82,8 @@ A fix release, such as `1.1.0.Beta3` after `1.1.0.Beta2` or `1.0.1.Final` after 
    ```
 3. Cherry-pick the fix from `main`, and give the release its own section in `docs/content/release-notes.md`.
 4. Build and test the branch locally, including `./mvnw -Dnative verify` in `cli`. The PR build runs for pull requests to `main` only, so the branch gets no CI before the release.
-5. Push the branch and run the `Release` workflow on it, with the fix version as **Release version** and the next snapshot of that line as **Development version**. `release.sh` cuts `release/<VERSION>` from the branch and merges it back into the branch at the end; the documentation on the branch keeps linking to the released CLI.
-6. If the `Release` run did not build the CLI, run the `Release CLI` workflow with the release version. It builds from the tag `v<VERSION>`.
+5. Push the branch and run the `Release` workflow on it, with the fix version as **Release version**, the next snapshot of that line as **Development version**, and **Latest** unchecked if a newer line has been released. `release.sh` cuts `release/<VERSION>` from the branch and merges it back into the branch at the end; the documentation on the branch keeps linking to the released CLI.
+6. If the `Release` run did not build the CLI, run the `Release CLI` workflow with the release version and the same **Latest** setting. It builds from the tag `v<VERSION>`.
 7. On `main`, add the release's section to `docs/content/release-notes.md`. If the fix release is the newest release, also set `Latest version` and the dependency snippet in `README.md` and `hardwood_version` in `docs/mkdocs.yml` to it.
 8. Publish the documentation from `v<VERSION>-docs`, cut from the tag `v<VERSION>`, as described below. Uncheck **update-latest** when the fix release belongs to an older line.
 

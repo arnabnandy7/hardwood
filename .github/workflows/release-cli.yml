@@ -14,12 +14,21 @@ on:
       release-version:
         description: 'Release version (must have an existing tag v<version>)'
         required: true
+      latest:
+        description: 'Tag the image as :latest; uncheck for a fix release of an older line'
+        required: true
+        type: boolean
+        default: true
   workflow_call:
     inputs:
       release-version:
         description: 'Release version (must have an existing tag v<version>)'
         required: true
         type: string
+      latest:
+        description: 'Tag the image as :latest'
+        required: true
+        type: boolean
 
 jobs:
   validate:
@@ -204,8 +213,11 @@ jobs:
 
       - name: 'Create and push multi-arch manifest'
         working-directory: ${{ runner.temp }}/digests
+        env:
+          LATEST_TAG: ${{ inputs.latest && format('--tag ghcr.io/{0}:latest', github.repository) || '' }}
         run: |
+          # shellcheck disable=SC2086 # LATEST_TAG is empty or one --tag option
           docker buildx imagetools create \
             --tag ghcr.io/${{ github.repository }}:${{ inputs.release-version }} \
-            --tag ghcr.io/${{ github.repository }}:latest \
+            $LATEST_TAG \
             $(printf 'ghcr.io/${{ github.repository }}@sha256:%s ' *)
