@@ -66,6 +66,26 @@ git checkout v<VERSION>
 MAVEN_CENTRAL_BEARER_TOKEN=`printf "${MAVENCENTRAL_USERNAME}:${MAVENCENTRAL_TOKEN}" | base64` ./mvnw clean verify -pl :hardwood-integration-test -Pcentral.manual.testing -s release-test-settings.xml
 ```
 
+## Releasing a fix from an earlier release
+
+A fix release, such as `1.1.0.Beta3` after `1.1.0.Beta2` or `1.0.1.Final` after `1.0.0.Final`, ships a fix without the rest of `main`. Land the fix on `main` first, through a pull request, then:
+
+1. Create the branch to release from out of the previous release's `v<PREVIOUS>-docs`, which is that release's tag plus its documentation touch-ups. Name it after the release (`1.1.0.Beta3`) or, for a line that may get further fix releases, after the line (`1.0.x`):
+   ```shell
+   git switch -c 1.0.x origin/v1.0.0.Final-docs
+   ```
+2. Set the next snapshot version, which `release:prepare` requires, and reset the SCM tag the previous release left in the POMs:
+   ```shell
+   ./mvnw versions:set -DnewVersion=1.0.1-SNAPSHOT -DgenerateBackupPoms=false -DprocessAllModules=true
+   grep -rl '<tag>v1.0.0.Final</tag>' --include=pom.xml . | xargs perl -pi -e 's|<tag>v1.0.0.Final</tag>|<tag>HEAD</tag>|'
+   ```
+3. Cherry-pick the fix from `main`, and give the release its own section in `docs/content/release-notes.md`.
+4. Build and test the branch locally, including `./mvnw -Dnative verify` in `cli`. The PR build runs for pull requests to `main` only, so the branch gets no CI before the release.
+5. Push the branch and run the `Release` workflow on it, with the fix version as **Release version** and the next snapshot of that line as **Development version**. `release.sh` cuts `release/<VERSION>` from the branch and merges it back into the branch at the end; the documentation on the branch keeps linking to the released CLI.
+6. If the `Release` run did not build the CLI, run the `Release CLI` workflow with the release version. It builds from the tag `v<VERSION>`.
+7. On `main`, add the release's section to `docs/content/release-notes.md`. If the fix release is the newest release, also set `Latest version` and the dependency snippet in `README.md` and `hardwood_version` in `docs/mkdocs.yml` to it.
+8. Publish the documentation from `v<VERSION>-docs`, cut from the tag `v<VERSION>`, as described below. Uncheck **update-latest** when the fix release belongs to an older line.
+
 ## Publishing the documentation
 
 Versioned documentation is published as a manual follow-up to the release, so post-release touch-ups (announcement blog post link, release-notes errata) can be folded in without mutating the release tag itself. The convention is:
