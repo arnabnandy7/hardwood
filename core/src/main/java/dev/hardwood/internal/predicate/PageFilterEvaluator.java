@@ -118,9 +118,7 @@ public class PageFilterEvaluator {
         boolean[] keep = new boolean[pageCount];
 
         PageRange candidates = orderedCandidates(columnIdx, leaf, readability);
-        int first = candidates == null ? 0 : candidates.first();
-        int end = candidates == null ? pageCount : candidates.end();
-        for (int i = first; i < end; i++) {
+        for (int i = candidates.first(); i < candidates.end(); i++) {
             UnitStats page = UnitStats.IndexPageStats.of(columnIdx, pages, i, rowCount, readability);
             keep[i] = page.decide(leaf, columnContext) != FilterDecision.CANNOT_MATCH;
         }
@@ -128,42 +126,47 @@ public class PageFilterEvaluator {
         return RowRanges.fromPages(pages, keep, rowCount);
     }
 
-    /// The contiguous page span an ordered Column Index says may match `leaf`, or `null` when
-    /// the index or predicate does not support a sound binary search. The returned span is only
-    /// a candidate: pages inside it still take the ordinary [UnitStats#decide] path above.
+    /// The contiguous page span an ordered Column Index says may match `leaf`, or the full page
+    /// range when the index or predicate does not support a sound binary search. The returned span
+    /// is only a candidate: pages inside it still take the ordinary [UnitStats#decide] path above.
     private static PageRange orderedCandidates(ColumnIndex columnIndex, ResolvedPredicate leaf,
             BoundsReadability readability) {
         int pageCount = columnIndex.getPageCount();
+        Operator operator = orderedOperator(leaf);
         if (pageCount == 0 || columnIndex.boundaryOrder() == ColumnIndex.BoundaryOrder.UNORDERED
-                || orderedOperator(leaf) == null || floatingPoint(leaf)) {
-            return null;
+                || operator == null || operator == Operator.NOT_EQ) {
+            return new PageRange(0, pageCount);
         }
         // BoundaryOrder says nothing about where null-only pages sit. Their min/max entries are
         // placeholders rather than bounds, so even one makes the linear decision path necessary.
         for (boolean nullPage : columnIndex.nullPages()) {
             if (nullPage) {
-                return null;
+                return new PageRange(0, pageCount);
             }
         }
 
-        OrderedSearch search = new OrderedSearch(columnIndex, leaf, readability);
-        boolean ascending = columnIndex.boundaryOrder() == ColumnIndex.BoundaryOrder.ASCENDING;
-        Operator operator = orderedOperator(leaf);
-        PageRange result = switch (operator) {
-            case EQ -> ascending
-                    ? new PageRange(search.firstFalse(0, pageCount, SearchTest.BEFORE),
-                            search.firstTrue(0, pageCount, SearchTest.AFTER))
-                    : new PageRange(search.firstFalse(0, pageCount, SearchTest.AFTER),
-                            search.firstTrue(0, pageCount, SearchTest.BEFORE));
-            case LT, LT_EQ -> ascending
-                    ? new PageRange(0, search.firstTrue(0, pageCount, SearchTest.ORIGINAL))
-                    : new PageRange(search.firstFalse(0, pageCount, SearchTest.ORIGINAL), pageCount);
-            case GT, GT_EQ -> ascending
-                    ? new PageRange(search.firstFalse(0, pageCount, SearchTest.ORIGINAL), pageCount)
-                    : new PageRange(0, search.firstTrue(0, pageCount, SearchTest.ORIGINAL));
-            case NOT_EQ -> null;
+        ResolvedPredicate tooSmall = switch (operator) {
+            case EQ -> withOperator(leaf, Operator.GT_EQ);
+            case GT, GT_EQ -> leaf;
+            case LT, LT_EQ -> null;
+            case NOT_EQ -> throw new IllegalStateException("NOT_EQ is not searched");
         };
-        return search.usable() && result != null && result.first() <= result.end() ? result : null;
+        ResolvedPredicate tooLarge = switch (operator) {
+            case EQ -> withOperator(leaf, Operator.LT_EQ);
+            case LT, LT_EQ -> leaf;
+            case GT, GT_EQ -> null;
+            case NOT_EQ -> throw new IllegalStateException("NOT_EQ is not searched");
+        };
+
+        boolean ascending = columnIndex.boundaryOrder() == ColumnIndex.BoundaryOrder.ASCENDING;
+        ResolvedPredicate atStart = ascending ? tooSmall : tooLarge;
+        ResolvedPredicate atEnd = ascending ? tooLarge : tooSmall;
+
+        OrderedSearch search = new OrderedSearch(columnIndex, leaf, readability, pageCount);
+        int first = atStart == null ? 0 : search.firstKept(atStart);
+        int end = atEnd == null ? pageCount : search.firstDropped(atEnd);
+
+        return search.usable() ? new PageRange(first, Math.max(first, end)) : new PageRange(0, pageCount);
     }
 
     /// Operators whose non-matching pages form one or two ordered runs.
@@ -176,14 +179,6 @@ public class PageFilterEvaluator {
             case ResolvedPredicate.BinaryPredicate p -> p.op();
             default -> null;
         };
-    }
-
-    /// Floating-point bounds do not cover NaN and therefore make no ordering promise over all
-    /// values a page may hold. Keep their existing linear, NaN-aware decisions.
-    private static boolean floatingPoint(ResolvedPredicate leaf) {
-        return leaf instanceof ResolvedPredicate.FloatPredicate
-                || leaf instanceof ResolvedPredicate.DoublePredicate
-                || leaf instanceof ResolvedPredicate.Float16Predicate;
     }
 
     /// The same scalar leaf with another operator, preserving its decoded literal and comparison.
@@ -203,12 +198,6 @@ public class PageFilterEvaluator {
         };
     }
 
-    private enum SearchTest {
-        ORIGINAL,
-        BEFORE,
-        AFTER
-    }
-
     /// Binary-searches predicates over one ordered min/max list. A bound that [MinMaxStats]
     /// refuses makes the whole attempt unusable; the caller then performs the linear scan.
     private static final class OrderedSearch {
@@ -216,32 +205,25 @@ public class PageFilterEvaluator {
         private final ColumnIndex columnIndex;
         private final ResolvedPredicate leaf;
         private final BoundsReadability readability;
+        private final int pageCount;
         private boolean usable = true;
 
         private OrderedSearch(ColumnIndex columnIndex, ResolvedPredicate leaf,
-                BoundsReadability readability) {
+                BoundsReadability readability, int pageCount) {
             this.columnIndex = columnIndex;
             this.leaf = leaf;
             this.readability = readability;
+            this.pageCount = pageCount;
         }
 
-        private int firstTrue(int from, int to, SearchTest test) {
+        /// The first page whose answer differs from `leadingAnswer`. Sound only because sorted
+        /// bounds put every page answering `leadingAnswer` before every page that does not.
+        private int edge(ResolvedPredicate tested, boolean leadingAnswer) {
+            int from = 0;
+            int to = pageCount;
             while (from < to && usable) {
                 int middle = (from + to) >>> 1;
-                if (test(middle, test)) {
-                    to = middle;
-                }
-                else {
-                    from = middle + 1;
-                }
-            }
-            return from;
-        }
-
-        private int firstFalse(int from, int to, SearchTest test) {
-            while (from < to && usable) {
-                int middle = (from + to) >>> 1;
-                if (test(middle, test)) {
+                if (test(middle, tested) == leadingAnswer) {
                     from = middle + 1;
                 }
                 else {
@@ -251,19 +233,22 @@ public class PageFilterEvaluator {
             return from;
         }
 
-        private boolean test(int pageIndex, SearchTest test) {
+        /// The first page that is not dropped, where the dropped pages come first.
+        private int firstKept(ResolvedPredicate tested) {
+            return edge(tested, true);
+        }
+
+        /// The first page that is dropped, where the dropped pages come last.
+        private int firstDropped(ResolvedPredicate tested) {
+            return edge(tested, false);
+        }
+
+        private boolean test(int pageIndex, ResolvedPredicate tested) {
             MinMaxStats stats = MinMaxStats.ofPage(columnIndex, pageIndex, leaf, readability);
             if (stats instanceof MinMaxStats.NoBounds) {
                 usable = false;
                 return false;
             }
-            ResolvedPredicate tested = switch (test) {
-                case ORIGINAL -> leaf;
-                // A page is before the literal when it cannot contain a value >= the literal;
-                // it is after when it cannot contain a value <= the literal.
-                case BEFORE -> withOperator(leaf, Operator.GT_EQ);
-                case AFTER -> withOperator(leaf, Operator.LT_EQ);
-            };
             return stats.canDrop(tested);
         }
 
