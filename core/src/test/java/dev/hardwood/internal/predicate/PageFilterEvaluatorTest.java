@@ -151,6 +151,37 @@ class PageFilterEvaluatorTest {
     }
 
     @Test
+    void ascendingBoundsLocateLessThanRange() {
+        ColumnIndex index = intColumnIndex(
+                new int[]{ 1, 11, 21, 31 },
+                new int[]{ 10, 20, 30, 40 },
+                ColumnIndex.BoundaryOrder.ASCENDING);
+
+        RowRanges ranges = evaluatePages(index, offsetIndex(10, 10, 10, 10), 40,
+                new ResolvedPredicate.IntPredicate(0, Operator.LT, 15));
+
+        assertThat(ranges.overlapsPage(0, 10)).isTrue();
+        assertThat(ranges.overlapsPage(10, 20)).isTrue();
+        assertThat(ranges.overlapsPage(20, 30)).isFalse();
+        assertThat(ranges.overlapsPage(30, 40)).isFalse();
+    }
+
+    @Test
+    void notEqualKeepsOrderedIndexOnLinearFallback() {
+        ColumnIndex index = intColumnIndex(
+                new int[]{ 1, 5, 10 },
+                new int[]{ 4, 5, 20 },
+                ColumnIndex.BoundaryOrder.ASCENDING);
+
+        RowRanges ranges = evaluatePages(index, offsetIndex(10, 10, 10), 30,
+                new ResolvedPredicate.IntPredicate(0, Operator.NOT_EQ, 5));
+
+        assertThat(ranges.overlapsPage(0, 10)).isTrue();
+        assertThat(ranges.overlapsPage(10, 20)).isFalse();
+        assertThat(ranges.overlapsPage(20, 30)).isTrue();
+    }
+
+    @Test
     void orderedBoundsAreReadLogarithmically() {
         int pageCount = 1_024;
         List<byte[]> mins = new ArrayList<>(pageCount);
