@@ -623,6 +623,24 @@ class PageFilterEvaluatorTest {
         );
     }
 
+    @Test
+    void orderedDoubleBoundsKeepTheLinearDecisionPath() {
+        // A NaN row satisfies GT against a number, so a page drops only where its own nan_count
+        // proves it NaN-free. Pages 0 and 2 hold NaN: the pages GT keeps are not one span.
+        ColumnIndex index = new ColumnIndex(new boolean[4],
+                List.of(doubleBytes(1.0), doubleBytes(20.0), doubleBytes(31.0), doubleBytes(41.0)),
+                List.of(doubleBytes(10.0), doubleBytes(30.0), doubleBytes(40.0), doubleBytes(50.0)),
+                ColumnIndex.BoundaryOrder.ASCENDING, null, null, null, new long[]{ 3, 0, 3, 0 });
+
+        RowRanges ranges = evaluatePages(index, offsetIndex(10, 10, 10, 10), 40,
+                new ResolvedPredicate.DoublePredicate(0, Operator.GT, 100.0));
+
+        assertThat(ranges.overlapsPage(0, 10)).isTrue();
+        assertThat(ranges.overlapsPage(10, 20)).isFalse();
+        assertThat(ranges.overlapsPage(20, 30)).isTrue();
+        assertThat(ranges.overlapsPage(30, 40)).isFalse();
+    }
+
     // Boolean Filtering Tests
 
     // 2 pages: [false,false], [false,true]

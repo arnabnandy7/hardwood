@@ -219,8 +219,8 @@ to its annotation.
 
 Pruning compares a unit's `min` / `max` bounds. A pair a reader cannot compare against is
 ignored rather than trusted, so the row group or page is kept and its rows are read and filtered
-one by one. Results are the same either way, except on an ordered column index (below); only the
-I/O saved is lost. Bounds are ignored when:
+one by one. Results are the same either way and only the I/O saved is lost, except on an ordered
+column index (below). Bounds are ignored when:
 
 | Reason | Bounds |
 |---|---|
