@@ -8,7 +8,6 @@
 package dev.hardwood.internal.predicate;
 
 import java.util.List;
-import java.util.function.Function;
 
 import dev.hardwood.internal.reader.plan.ColumnIndexBuffers;
 import dev.hardwood.internal.reader.plan.RowGroupIndexBuffers;
@@ -55,27 +54,23 @@ public class PageFilterEvaluator {
     public static RowRanges computeMatchingRows(ResolvedPredicate predicate, RowGroup rowGroup,
             RowGroupIndexBuffers indexBuffers, LogContext logContext, BoundsReadability readability) {
         long rowCount = rowGroup.numRows();
-        return combine(predicate, rowCount,
-                leaf -> evaluateLeafPages(leaf, rowGroup, indexBuffers, rowCount, logContext, readability));
+        return evaluate(predicate, rowGroup, indexBuffers, rowCount, logContext, readability);
     }
 
-    /// Folds `predicate` into row ranges, asking `leafRanges` for each leaf: `AND` intersects
-    /// its children's ranges and `OR` unions them. Used by [#computeMatchingRows] and by the
-    /// page-pruning benchmark, which supplies leaf ranges over indexes it has already parsed.
-    static RowRanges combine(ResolvedPredicate predicate, long rowCount,
-            Function<ResolvedPredicate, RowRanges> leafRanges) {
+    private static RowRanges evaluate(ResolvedPredicate predicate, RowGroup rowGroup,
+            RowGroupIndexBuffers indexBuffers, long rowCount, LogContext logContext, BoundsReadability readability) {
         return switch (predicate) {
             case ResolvedPredicate.And a -> {
                 RowRanges result = RowRanges.all(rowCount);
                 for (ResolvedPredicate child : a.children()) {
-                    result = result.intersect(combine(child, rowCount, leafRanges));
+                    result = result.intersect(evaluate(child, rowGroup, indexBuffers, rowCount, logContext, readability));
                 }
                 yield result;
             }
             case ResolvedPredicate.Or o -> {
                 RowRanges result = null;
                 for (ResolvedPredicate child : o.children()) {
-                    RowRanges childRanges = combine(child, rowCount, leafRanges);
+                    RowRanges childRanges = evaluate(child, rowGroup, indexBuffers, rowCount, logContext, readability);
                     result = (result == null) ? childRanges : result.union(childRanges);
                 }
                 yield (result != null) ? result : RowRanges.all(rowCount);
@@ -83,7 +78,7 @@ public class PageFilterEvaluator {
             // Parquet has no per-page geospatial statistics (GeospatialStatistics lives only on
             // ColumnMetaData, applied during row-group filtering), so no page-level pruning is possible.
             case ResolvedPredicate.GeospatialPredicate ignored -> RowRanges.all(rowCount);
-            default -> leafRanges.apply(predicate);
+            default -> evaluateLeafPages(predicate, rowGroup, indexBuffers, rowCount, logContext, readability);
         };
     }
 

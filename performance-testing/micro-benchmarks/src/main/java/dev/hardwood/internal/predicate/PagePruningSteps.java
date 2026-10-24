@@ -8,7 +8,6 @@
 package dev.hardwood.internal.predicate;
 
 import dev.hardwood.internal.reader.plan.ColumnIndexBuffers;
-import dev.hardwood.internal.reader.select.RowRanges;
 import dev.hardwood.metadata.ColumnIndex;
 import dev.hardwood.metadata.ColumnMetaData;
 import dev.hardwood.metadata.OffsetIndex;
@@ -44,23 +43,23 @@ public final class PagePruningSteps {
         return new ParsedIndexes(column, pair.columnIndex(), pair.offsetIndex());
     }
 
-    /// Decides `predicate` over the parsed indexes of the one column it tests, combining the leaves
-    /// of an `AND` or `OR` as [PageFilterEvaluator#computeMatchingRows] does. Returns the number of
-    /// rows kept.
+    /// Decides the leaf `leaf` over the parsed indexes of the column it tests, as
+    /// [PageFilterEvaluator#computeMatchingRows] does for each leaf. Returns the number of rows
+    /// kept.
     ///
-    /// @throws IllegalArgumentException if a leaf tests a column other than the parsed one
-    public static long decide(ResolvedPredicate predicate, ParsedIndexes indexes, long rowCount) {
-        return PageFilterEvaluator.combine(predicate, rowCount, leaf -> decideLeaf(leaf, indexes, rowCount))
-                .rowCount(rowCount);
-    }
-
-    private static RowRanges decideLeaf(ResolvedPredicate leaf, ParsedIndexes indexes, long rowCount) {
+    /// @throws IllegalArgumentException if `leaf` is an `AND` or `OR`, or tests a column other
+    ///         than the parsed one
+    public static long decide(ResolvedPredicate leaf, ParsedIndexes indexes, long rowCount) {
+        if (leaf instanceof ResolvedPredicate.And || leaf instanceof ResolvedPredicate.Or) {
+            throw new IllegalArgumentException("Expected a leaf predicate but got "
+                    + leaf.getClass().getSimpleName());
+        }
         int column = ResolvedPredicate.leafColumnIndex(leaf);
         if (column != indexes.column()) {
             throw new IllegalArgumentException("The leaf tests column " + column
                     + " but the parsed indexes are those of column " + indexes.column());
         }
         return PageFilterEvaluator.evaluatePages(indexes.columnIndex(), indexes.offsetIndex(), rowCount, leaf,
-                LOG_CONTEXT, BoundsReadability.ALL);
+                LOG_CONTEXT, BoundsReadability.ALL).rowCount(rowCount);
     }
 }
