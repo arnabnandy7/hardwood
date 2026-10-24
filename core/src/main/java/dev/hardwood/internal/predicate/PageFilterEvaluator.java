@@ -8,6 +8,7 @@
 package dev.hardwood.internal.predicate;
 
 import java.util.List;
+import java.util.function.Function;
 
 import dev.hardwood.internal.reader.plan.ColumnIndexBuffers;
 import dev.hardwood.internal.reader.plan.RowGroupIndexBuffers;
@@ -54,23 +55,27 @@ public class PageFilterEvaluator {
     public static RowRanges computeMatchingRows(ResolvedPredicate predicate, RowGroup rowGroup,
             RowGroupIndexBuffers indexBuffers, LogContext logContext, BoundsReadability readability) {
         long rowCount = rowGroup.numRows();
-        return evaluate(predicate, rowGroup, indexBuffers, rowCount, logContext, readability);
+        return combine(predicate, rowCount,
+                leaf -> evaluateLeafPages(leaf, rowGroup, indexBuffers, rowCount, logContext, readability));
     }
 
-    private static RowRanges evaluate(ResolvedPredicate predicate, RowGroup rowGroup,
-            RowGroupIndexBuffers indexBuffers, long rowCount, LogContext logContext, BoundsReadability readability) {
+    /// Folds `predicate` into row ranges, asking `leafRanges` for each leaf: `AND` intersects
+    /// its children's ranges and `OR` unions them. Used by [#computeMatchingRows] and by the
+    /// page-pruning benchmark, which supplies leaf ranges over indexes it has already parsed.
+    static RowRanges combine(ResolvedPredicate predicate, long rowCount,
+            Function<ResolvedPredicate, RowRanges> leafRanges) {
         return switch (predicate) {
             case ResolvedPredicate.And a -> {
                 RowRanges result = RowRanges.all(rowCount);
                 for (ResolvedPredicate child : a.children()) {
-                    result = result.intersect(evaluate(child, rowGroup, indexBuffers, rowCount, logContext, readability));
+                    result = result.intersect(combine(child, rowCount, leafRanges));
                 }
                 yield result;
             }
             case ResolvedPredicate.Or o -> {
                 RowRanges result = null;
                 for (ResolvedPredicate child : o.children()) {
-                    RowRanges childRanges = evaluate(child, rowGroup, indexBuffers, rowCount, logContext, readability);
+                    RowRanges childRanges = combine(child, rowCount, leafRanges);
                     result = (result == null) ? childRanges : result.union(childRanges);
                 }
                 yield (result != null) ? result : RowRanges.all(rowCount);
@@ -78,7 +83,7 @@ public class PageFilterEvaluator {
             // Parquet has no per-page geospatial statistics (GeospatialStatistics lives only on
             // ColumnMetaData, applied during row-group filtering), so no page-level pruning is possible.
             case ResolvedPredicate.GeospatialPredicate ignored -> RowRanges.all(rowCount);
-            default -> evaluateLeafPages(predicate, rowGroup, indexBuffers, rowCount, logContext, readability);
+            default -> leafRanges.apply(predicate);
         };
     }
 
@@ -107,7 +112,8 @@ public class PageFilterEvaluator {
     }
 
     /// Decides a leaf page by page over a pre-parsed Column Index and Offset Index, keeping every
-    /// page the decision does not rule out. Used by [#evaluateLeafPages] and directly by tests.
+    /// page the decision does not rule out. Used by [#evaluateLeafPages], and directly by tests
+    /// and the page-pruning benchmark.
     ///
     /// @param columnContext the column chunk the two indexes describe, which each page narrows
     ///        to itself to report bounds it had to discard
@@ -270,7 +276,7 @@ public class PageFilterEvaluator {
     /// [dev.hardwood.internal.reader.footer.ParquetMetadataReader] attributes, so failures are
     /// named here by the read pipeline, which names the file, row group and column on the way out;
     /// what this frame adds is which of the chunk's two indexes was being read.
-    private static IndexPair readIndexPair(ColumnIndexBuffers colBuffers, int columnIndex,
+    static IndexPair readIndexPair(ColumnIndexBuffers colBuffers, int columnIndex,
             ColumnMetaData metaData) {
         ColumnIndex columnIdx;
         OffsetIndex offsetIdx;
@@ -307,5 +313,5 @@ public class PageFilterEvaluator {
     }
 
 
-    private record IndexPair(ColumnIndex columnIndex, OffsetIndex offsetIndex) {}
+    record IndexPair(ColumnIndex columnIndex, OffsetIndex offsetIndex) {}
 }

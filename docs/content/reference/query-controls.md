@@ -219,7 +219,8 @@ to its annotation.
 
 Pruning compares a unit's `min` / `max` bounds. A pair a reader cannot compare against is
 ignored rather than trusted, so the row group or page is kept and its rows are read and filtered
-one by one. Results are the same either way; only the I/O saved is lost. Bounds are ignored when:
+one by one. Results are the same either way, except on an ordered column index (below); only the
+I/O saved is lost. Bounds are ignored when:
 
 | Reason | Bounds |
 |---|---|
@@ -231,6 +232,12 @@ one by one. Results are the same either way; only the I/O saved is lost. Bounds 
 | An `INT96` bound holds nanoseconds of the day outside one day | Under `INT96_TIMESTAMP_ORDER`, which orders the day before the nanoseconds of the day, such a bound does not sort by the instant it encodes |
 | The column's annotation is dropped | An annotation the column's physical type cannot carry, or one this release does not recognize, so the column is read as its physical type while its bounds were recorded in the annotation's order |
 | The file declares a `ColumnOrder` this release does not recognize | The Parquet spec directs a reader to ignore `min` / `max` under a column order it does not support; this applies to every column type |
+
+On a column index that declares its page bounds `ASCENDING` or `DESCENDING` and has no null-only
+page, `eq`, `lt`, `ltEq`, `gt` and `gtEq` on a column other than `FLOAT`, `DOUBLE`, `FLOAT16` and
+`BOOLEAN` binary-search the bounds and skip the pages outside the matching span unread. A skipped
+page whose own bounds would be ignored, such as a minimum above its maximum, loses its matching
+rows. If a page the search reads has bounds that would be ignored, every page is decided on its own.
 
 The bounds themselves are still reported as the file carries them, by `Statistics` on the metadata
 API and by `hardwood inspect` and `hardwood dive`.
