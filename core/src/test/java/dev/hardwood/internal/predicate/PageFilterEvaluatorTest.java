@@ -8,13 +8,17 @@
 package dev.hardwood.internal.predicate;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.AbstractList;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.function.IntFunction;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
@@ -40,6 +44,7 @@ import dev.hardwood.metadata.FileMetaData;
 import dev.hardwood.metadata.OffsetIndex;
 import dev.hardwood.metadata.PageLocation;
 import dev.hardwood.metadata.PhysicalType;
+import dev.hardwood.metadata.RepetitionType;
 import dev.hardwood.metadata.RowGroup;
 import dev.hardwood.reader.FilterPredicate;
 import dev.hardwood.reader.FilterPredicate.Operator;
@@ -114,6 +119,314 @@ class PageFilterEvaluatorTest {
                 Arguments.of(Operator.GT_EQ, 11,  false, true,  true),
                 Arguments.of(Operator.GT_EQ, 31,  false, false, false)
         );
+    }
+
+    @Test
+    void ascendingBoundsLocateEqualityAcrossOverlappingPages() {
+        ColumnIndex index = intColumnIndex(
+                new int[]{ 1, 8, 18, 31 },
+                new int[]{ 10, 20, 30, 40 },
+                ColumnIndex.BoundaryOrder.ASCENDING);
+
+        RowRanges ranges = evaluatePages(index, offsetIndex(10, 10, 10, 10), 40,
+                new ResolvedPredicate.IntPredicate(0, Operator.EQ, 9));
+
+        assertThat(ranges.overlapsPage(0, 10)).isTrue();
+        assertThat(ranges.overlapsPage(10, 20)).isTrue();
+        assertThat(ranges.overlapsPage(20, 30)).isFalse();
+        assertThat(ranges.overlapsPage(30, 40)).isFalse();
+    }
+
+    @Test
+    void descendingBoundsLocateRange() {
+        ColumnIndex index = intColumnIndex(
+                new int[]{ 31, 21, 11, 1 },
+                new int[]{ 40, 30, 20, 10 },
+                ColumnIndex.BoundaryOrder.DESCENDING);
+
+        RowRanges ranges = evaluatePages(index, offsetIndex(10, 10, 10, 10), 40,
+                new ResolvedPredicate.IntPredicate(0, Operator.GT_EQ, 21));
+
+        assertThat(ranges.overlapsPage(0, 10)).isTrue();
+        assertThat(ranges.overlapsPage(10, 20)).isTrue();
+        assertThat(ranges.overlapsPage(20, 30)).isFalse();
+        assertThat(ranges.overlapsPage(30, 40)).isFalse();
+    }
+
+    @Test
+    void ascendingBoundsLocateLessThanRange() {
+        ColumnIndex index = intColumnIndex(
+                new int[]{ 1, 11, 21, 31 },
+                new int[]{ 10, 20, 30, 40 },
+                ColumnIndex.BoundaryOrder.ASCENDING);
+
+        RowRanges ranges = evaluatePages(index, offsetIndex(10, 10, 10, 10), 40,
+                new ResolvedPredicate.IntPredicate(0, Operator.LT, 15));
+
+        assertThat(ranges.overlapsPage(0, 10)).isTrue();
+        assertThat(ranges.overlapsPage(10, 20)).isTrue();
+        assertThat(ranges.overlapsPage(20, 30)).isFalse();
+        assertThat(ranges.overlapsPage(30, 40)).isFalse();
+    }
+
+    @Test
+    void notEqualKeepsOrderedIndexOnLinearFallback() {
+        ColumnIndex index = intColumnIndex(
+                new int[]{ 1, 5, 10 },
+                new int[]{ 4, 5, 20 },
+                ColumnIndex.BoundaryOrder.ASCENDING);
+
+        RowRanges ranges = evaluatePages(index, offsetIndex(10, 10, 10), 30,
+                new ResolvedPredicate.IntPredicate(0, Operator.NOT_EQ, 5));
+
+        assertThat(ranges.overlapsPage(0, 10)).isTrue();
+        assertThat(ranges.overlapsPage(10, 20)).isFalse();
+        assertThat(ranges.overlapsPage(20, 30)).isTrue();
+    }
+
+    @Test
+    void orderedBoundsAreReadLogarithmically() {
+        int pageCount = 1_024;
+        List<byte[]> mins = new ArrayList<>(pageCount);
+        List<byte[]> maxs = new ArrayList<>(pageCount);
+        int[] rowsPerPage = new int[pageCount];
+        Arrays.fill(rowsPerPage, 1);
+        for (int i = 0; i < pageCount; i++) {
+            mins.add(intBytes(i * 10));
+            maxs.add(intBytes(i * 10 + 9));
+        }
+        int[] reads = { 0 };
+        ColumnIndex index = new ColumnIndex(new boolean[pageCount],
+                new CountingList(mins, reads), new CountingList(maxs, reads),
+                ColumnIndex.BoundaryOrder.ASCENDING, null, null, null, null);
+
+        RowRanges ranges = evaluatePages(index, offsetIndex(rowsPerPage), pageCount,
+                new ResolvedPredicate.IntPredicate(0, Operator.EQ, 7_005));
+
+        assertThat(ranges.overlapsPage(700, 701)).isTrue();
+        assertThat(ranges.rowCount(pageCount)).isEqualTo(1);
+        assertThat(reads[0]).isLessThan(100);
+    }
+
+    @Test
+    void nullOnlyPageKeepsOrderedIndexOnLinearFallback() {
+        ColumnIndex index = new ColumnIndex(
+                new boolean[]{ false, true, false },
+                List.of(intBytes(1), intBytes(0), intBytes(21)),
+                List.of(intBytes(10), intBytes(0), intBytes(30)),
+                ColumnIndex.BoundaryOrder.ASCENDING,
+                null, null, null, null);
+
+        RowRanges ranges = evaluatePages(index, THREE_PAGE_OFFSET_INDEX, THREE_PAGE_ROW_COUNT,
+                new ResolvedPredicate.IntPredicate(0, Operator.GT, 0));
+
+        assertThat(ranges.overlapsPage(0, 30)).isTrue();
+        assertThat(ranges.overlapsPage(30, 60)).isFalse();
+        assertThat(ranges.overlapsPage(60, 90)).isTrue();
+    }
+
+    @Test
+    void unprobedInvertedPageIsDroppedOnTheDeclaredOrder() {
+        // Page 4's pair is inverted, which the linear path discards and therefore keeps. Both
+        // lists still ascend, so a writer records ASCENDING, and a search for 5 probes pages 3,
+        // 1 and 0 only: page 4 is dropped on the declared order, unread.
+        ColumnIndex index = intColumnIndex(
+                new int[]{ 0, 10, 20, 30, 50, 60, 70 },
+                new int[]{ 9, 19, 29, 39, 40, 69, 79 },
+                ColumnIndex.BoundaryOrder.ASCENDING);
+
+        RowRanges ranges = evaluatePages(index, offsetIndex(10, 10, 10, 10, 10, 10, 10), 70,
+                new ResolvedPredicate.IntPredicate(0, Operator.EQ, 5));
+
+        assertThat(ranges.overlapsPage(0, 10)).isTrue();
+        assertThat(ranges.overlapsPage(10, 70)).isFalse();
+    }
+
+    @Test
+    void probedInvertedPageKeepsOrderedIndexOnLinearFallback() {
+        ColumnIndex index = intColumnIndex(
+                new int[]{ 1, 20, 21 },
+                new int[]{ 10, 15, 30 },
+                ColumnIndex.BoundaryOrder.ASCENDING);
+
+        RowRanges ranges = evaluatePages(index, THREE_PAGE_OFFSET_INDEX, THREE_PAGE_ROW_COUNT,
+                new ResolvedPredicate.IntPredicate(0, Operator.EQ, 12));
+
+        assertThat(ranges.overlapsPage(0, 30)).isFalse();
+        assertThat(ranges.overlapsPage(30, 60)).isTrue();
+        assertThat(ranges.overlapsPage(60, 90)).isFalse();
+    }
+
+    @Test
+    void unreadableSortOrderKeepsOrderedIndexOnLinearFallback() {
+        FileSchema schema = FileSchema.builder("t")
+                .addColumn("id", PhysicalType.INT32, RepetitionType.REQUIRED)
+                .build();
+        BoundsReadability unreadable = BoundsReadability.of(schema, List.of(), ordinal -> true);
+        ColumnIndex index = intColumnIndex(
+                new int[]{ 1, 11, 21 },
+                new int[]{ 10, 20, 30 },
+                ColumnIndex.BoundaryOrder.ASCENDING);
+
+        RowRanges ranges = PageFilterEvaluator.evaluatePages(index, THREE_PAGE_OFFSET_INDEX,
+                THREE_PAGE_ROW_COUNT, new ResolvedPredicate.IntPredicate(0, Operator.EQ, 15), UNNAMED,
+                unreadable);
+
+        assertThat(ranges.overlapsPage(0, 30)).isTrue();
+        assertThat(ranges.overlapsPage(30, 60)).isTrue();
+        assertThat(ranges.overlapsPage(60, 90)).isTrue();
+    }
+
+    // Ascending page bounds that overlap, touch and repeat: page `i` holds `[min[i], max[i]]`, as
+    // positions that each leaf type below maps onto its own values.
+    private static final int[] ORDERED_MINS = { 0, 8, 10, 10, 25, 40, 40, 55 };
+    private static final int[] ORDERED_MAXS = { 9, 10, 10, 30, 40, 40, 50, 60 };
+    private static final int UINT32_BASE = Integer.MAX_VALUE - 31;
+    private static final long UINT64_BASE = Long.MAX_VALUE - 31;
+
+    /// A leaf type over the positions of [#ORDERED_MINS]: the bound a position is stored as, the
+    /// leaf comparing against it, the readability its bounds are decided under, and whether the
+    /// leaf reads them, so that parity is not met by both paths keeping every page.
+    private record OrderedLeafType(String name, IntFunction<byte[]> bound, OrderedLeaf leaf,
+            BoundsReadability readability, boolean readsBounds) {
+
+        private OrderedLeafType(String name, IntFunction<byte[]> bound, OrderedLeaf leaf) {
+            this(name, bound, leaf, BoundsReadability.ALL, true);
+        }
+
+        @Override
+        public String toString() {
+            return name;
+        }
+    }
+
+    @FunctionalInterface
+    private interface OrderedLeaf {
+        ResolvedPredicate at(Operator op, int position);
+    }
+
+    static Stream<OrderedLeafType> orderedLeafTypes() {
+        return Stream.of(
+                new OrderedLeafType("INT32", p -> intBytes(p - 30),
+                        (op, p) -> new ResolvedPredicate.IntPredicate(0, op, p - 30)),
+                new OrderedLeafType("INT64", p -> longBytes(p - 30L),
+                        (op, p) -> new ResolvedPredicate.LongPredicate(0, op, p - 30L)),
+                // The positions straddle 2^31 and 2^63, where unsigned order departs from signed.
+                new OrderedLeafType("UINT32", p -> intBytes(UINT32_BASE + p),
+                        (op, p) -> new ResolvedPredicate.UnsignedIntPredicate(0, op, UINT32_BASE + p)),
+                new OrderedLeafType("UINT64", p -> longBytes(UINT64_BASE + p),
+                        (op, p) -> new ResolvedPredicate.UnsignedLongPredicate(0, op, UINT64_BASE + p)),
+                new OrderedLeafType("BYTE_STRING", PageFilterEvaluatorTest::paddedDigits,
+                        (op, p) -> new ResolvedPredicate.BinaryPredicate(0, op, paddedDigits(p),
+                                ResolvedPredicate.BinaryPredicate.Comparison.BYTE_STRING)),
+                // Signed big-endian, so the positions below 30 are negative decimals.
+                new OrderedLeafType("FIXED_DECIMAL", p -> bigEndianInt(p - 30),
+                        (op, p) -> new ResolvedPredicate.BinaryPredicate(0, op, bigEndianInt(p - 30),
+                                ResolvedPredicate.BinaryPredicate.Comparison.FIXED_DECIMAL)),
+                // The fewest bytes that hold each value, so bounds of one and two bytes compare
+                // only once the shorter is sign-extended: 7F against 00 80, 9C against FF 00.
+                new OrderedLeafType("VARIABLE_DECIMAL", PageFilterEvaluatorTest::minimalDecimal,
+                        (op, p) -> new ResolvedPredicate.BinaryPredicate(0, op, minimalDecimal(p),
+                                ResolvedPredicate.BinaryPredicate.Comparison.VARIABLE_DECIMAL)),
+                // Little-endian, so the leading byte is the least significant and the sign sits
+                // in the last.
+                new OrderedLeafType("FIXED_TIMESTAMP", PageFilterEvaluatorTest::littleEndianTimestamp,
+                        (op, p) -> new ResolvedPredicate.BinaryPredicate(0, op, littleEndianTimestamp(p),
+                                ResolvedPredicate.BinaryPredicate.Comparison.FIXED_TIMESTAMP)),
+                // Bounds this comparison does not read, so every page takes the linear path.
+                new OrderedLeafType("STORED_BYTES", p -> bigEndianInt(p - 30),
+                        (op, p) -> new ResolvedPredicate.BinaryPredicate(0, op, bigEndianInt(p - 30),
+                                ResolvedPredicate.BinaryPredicate.Comparison.STORED_BYTES),
+                        BoundsReadability.ALL, false),
+                // INT96 bounds in INT96_TIMESTAMP_ORDER, which both comparisons read, so they take
+                // the search. The positions are six hours apart and cross midnight.
+                new OrderedLeafType("INT96 STORED_BYTES", PageFilterEvaluatorTest::int96Timestamp,
+                        (op, p) -> new ResolvedPredicate.BinaryPredicate(0, op, int96Timestamp(p),
+                                ResolvedPredicate.BinaryPredicate.Comparison.STORED_BYTES),
+                        BoundsReadability.ofOneColumn(true), true),
+                new OrderedLeafType("INT96 INT96_INSTANT", PageFilterEvaluatorTest::int96Timestamp,
+                        (op, p) -> new ResolvedPredicate.BinaryPredicate(0, op, int96Timestamp(p),
+                                ResolvedPredicate.BinaryPredicate.Comparison.INT96_INSTANT),
+                        BoundsReadability.ofOneColumn(true), true));
+    }
+
+    @ParameterizedTest
+    @MethodSource("orderedLeafTypes")
+    void orderedSearchKeepsThePagesTheLinearScanKeeps(OrderedLeafType type) {
+        int pageCount = ORDERED_MINS.length;
+        int[] rowsPerPage = new int[pageCount];
+        Arrays.fill(rowsPerPage, 1);
+        OffsetIndex offsets = offsetIndex(rowsPerPage);
+        for (ColumnIndex.BoundaryOrder order : List.of(ColumnIndex.BoundaryOrder.ASCENDING,
+                ColumnIndex.BoundaryOrder.DESCENDING)) {
+            List<byte[]> mins = new ArrayList<>();
+            List<byte[]> maxs = new ArrayList<>();
+            for (int i = 0; i < pageCount; i++) {
+                int page = order == ColumnIndex.BoundaryOrder.ASCENDING ? i : pageCount - 1 - i;
+                mins.add(type.bound().apply(ORDERED_MINS[page]));
+                maxs.add(type.bound().apply(ORDERED_MAXS[page]));
+            }
+            ColumnIndex ordered = new ColumnIndex(new boolean[pageCount], mins, maxs, order,
+                    null, null, null, null);
+            ColumnIndex unordered = new ColumnIndex(new boolean[pageCount], mins, maxs,
+                    ColumnIndex.BoundaryOrder.UNORDERED, null, null, null, null);
+            boolean linearDropped = false;
+            for (Operator op : Operator.values()) {
+                for (int position = -2; position <= 62; position++) {
+                    ResolvedPredicate leaf = type.leaf().at(op, position);
+                    List<Integer> linear = keptPages(PageFilterEvaluator.evaluatePages(unordered, offsets,
+                            pageCount, leaf, UNNAMED, type.readability()), pageCount);
+                    assertThat(keptPages(PageFilterEvaluator.evaluatePages(ordered, offsets, pageCount, leaf,
+                            UNNAMED, type.readability()), pageCount))
+                            .as("%s %s %s at position %d", type, order, op, position)
+                            .isEqualTo(linear);
+                    linearDropped |= linear.size() < pageCount;
+                }
+            }
+            assertThat(linearDropped).as("%s %s: the linear scan drops a page", type, order)
+                    .isEqualTo(type.readsBounds());
+        }
+    }
+
+    private static List<Integer> keptPages(RowRanges ranges, int pageCount) {
+        List<Integer> kept = new ArrayList<>();
+        for (int page = 0; page < pageCount; page++) {
+            if (ranges.overlapsPage(page, page + 1)) {
+                kept.add(page);
+            }
+        }
+        return kept;
+    }
+
+    private static byte[] paddedDigits(int position) {
+        return String.format("%03d", position + 2).getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static byte[] bigEndianInt(int value) {
+        return ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(value).array();
+    }
+
+    /// `(position - 30) * 10` in the fewest big-endian two's complement bytes that hold it.
+    private static byte[] minimalDecimal(int position) {
+        return BigInteger.valueOf((position - 30) * 10L).toByteArray();
+    }
+
+    /// `(position - 30) * 1000` as a little-endian two's complement 96-bit integer.
+    private static byte[] littleEndianTimestamp(int position) {
+        long value = (position - 30) * 1_000L;
+        return ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
+                .putLong(value).putInt(value < 0 ? -1 : 0).array();
+    }
+
+    /// An `INT96` timestamp `(position - 30) * 6` hours from the epoch: the nanoseconds of the
+    /// day, then the Julian day, both little-endian.
+    private static byte[] int96Timestamp(int position) {
+        long nanosPerDay = 86_400_000_000_000L;
+        long nanos = (position - 30) * 6 * 3_600_000_000_000L;
+        return ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
+                .putLong(Math.floorMod(nanos, nanosPerDay))
+                .putInt(Math.toIntExact(2_440_588 + Math.floorDiv(nanos, nanosPerDay)))
+                .array();
     }
 
     @Test
@@ -310,6 +623,24 @@ class PageFilterEvaluatorTest {
         );
     }
 
+    @Test
+    void orderedDoubleBoundsKeepTheLinearDecisionPath() {
+        // A NaN row satisfies GT against a number, so a page drops only where its own nan_count
+        // proves it NaN-free. Pages 0 and 2 hold NaN: the pages GT keeps are not one span.
+        ColumnIndex index = new ColumnIndex(new boolean[4],
+                List.of(doubleBytes(1.0), doubleBytes(20.0), doubleBytes(31.0), doubleBytes(41.0)),
+                List.of(doubleBytes(10.0), doubleBytes(30.0), doubleBytes(40.0), doubleBytes(50.0)),
+                ColumnIndex.BoundaryOrder.ASCENDING, null, null, null, new long[]{ 3, 0, 3, 0 });
+
+        RowRanges ranges = evaluatePages(index, offsetIndex(10, 10, 10, 10), 40,
+                new ResolvedPredicate.DoublePredicate(0, Operator.GT, 100.0));
+
+        assertThat(ranges.overlapsPage(0, 10)).isTrue();
+        assertThat(ranges.overlapsPage(10, 20)).isFalse();
+        assertThat(ranges.overlapsPage(20, 30)).isTrue();
+        assertThat(ranges.overlapsPage(30, 40)).isFalse();
+    }
+
     // Boolean Filtering Tests
 
     // 2 pages: [false,false], [false,true]
@@ -335,6 +666,20 @@ class PageFilterEvaluatorTest {
                 Arguments.of(Operator.NOT_EQ, false, false, true),   // drop page 0 (min==max==false)
                 Arguments.of(Operator.NOT_EQ, true,  true,  true)    // neither page has min==max==true
         );
+    }
+
+    @Test
+    void orderedBooleanBoundsKeepTheLinearDecisionPath() {
+        ColumnIndex index = new ColumnIndex(new boolean[2],
+                List.of(new byte[]{ 0 }, new byte[]{ 0 }),
+                List.of(new byte[]{ 0 }, new byte[]{ 1 }),
+                ColumnIndex.BoundaryOrder.ASCENDING, null, null, null, null);
+
+        RowRanges ranges = evaluatePages(index, TWO_PAGE_OFFSET_INDEX, TWO_PAGE_ROW_COUNT,
+                new ResolvedPredicate.BooleanPredicate(0, Operator.EQ, true));
+
+        assertThat(ranges.overlapsPage(0, 50)).isFalse();
+        assertThat(ranges.overlapsPage(50, 100)).isTrue();
     }
 
     // Binary Filtering Tests
@@ -484,6 +829,11 @@ class PageFilterEvaluatorTest {
     }
 
     private static ColumnIndex intColumnIndex(int[] mins, int[] maxs) {
+        return intColumnIndex(mins, maxs, ColumnIndex.BoundaryOrder.UNORDERED);
+    }
+
+    private static ColumnIndex intColumnIndex(int[] mins, int[] maxs,
+            ColumnIndex.BoundaryOrder boundaryOrder) {
         List<byte[]> minValues = new ArrayList<>();
         List<byte[]> maxValues = new ArrayList<>();
         boolean[] nullPages = new boolean[mins.length];
@@ -492,7 +842,29 @@ class PageFilterEvaluatorTest {
             maxValues.add(intBytes(maxs[i]));
         }
         return new ColumnIndex(nullPages, minValues, maxValues,
-                ColumnIndex.BoundaryOrder.UNORDERED, null, null, null, null);
+                boundaryOrder, null, null, null, null);
+    }
+
+    private static final class CountingList extends AbstractList<byte[]> {
+
+        private final List<byte[]> values;
+        private final int[] reads;
+
+        private CountingList(List<byte[]> values, int[] reads) {
+            this.values = values;
+            this.reads = reads;
+        }
+
+        @Override
+        public byte[] get(int index) {
+            reads[0]++;
+            return values.get(index);
+        }
+
+        @Override
+        public int size() {
+            return values.size();
+        }
     }
 
     private static ColumnIndex longColumnIndex(long[] mins, long[] maxs) {

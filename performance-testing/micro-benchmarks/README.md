@@ -40,6 +40,7 @@ allocation profiling, `-rf json -rff out.json` for machine-readable results,
 | `DictionaryPageParseBenchmark` | One dictionary page set up through each of the parser's two entry points, against the decode floor (#1096) | self-generating |
 | `DictionaryPageSetupBenchmark` | Per-column-chunk dictionary setup — page-header parse and checksum — over many row groups (#1096) | self-generating |
 | `PageScanBenchmark` | Sequential header-based page scan vs. offset-index lookup | `generate_benchmark_data.py` |
+| `PagePruningBenchmark` | Page-index pruning of one row group over a sorted column of 1,000 and 100,000 pages: the page decision with and without the ordered search, and parse plus decision together, for a point and a 10% predicate (#838) | self-generating |
 | `PageHandlingBenchmark` | Per-page decompression vs. full page decode | taxi data, downloaded by `./mvnw verify -Pperformance-test` |
 | `MemoryMapBenchmark` | Raw I/O floor: mmap + copy of a whole file, no decode | taxi data, downloaded by `./mvnw verify -Pperformance-test` |
 | `FixedSizeListDecodeBenchmark` | Fixed-size-list fast path vs. general list decode across vector widths | `generate_fixed_size_list_data.py` |
